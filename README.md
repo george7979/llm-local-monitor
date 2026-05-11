@@ -23,7 +23,7 @@ The monitor runs as a Docker container on the Dockge host and queries the GPU se
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
 | **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
 | **Loaded models** | Model, size, quant, GPU/CPU split, context | Ollama REST API `:11434/api/ps` |
-| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) | SSH → `nvidia-smi` |
+| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge on cards with active process | SSH → `nvidia-smi` |
 
 ---
 
