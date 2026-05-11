@@ -1,0 +1,11 @@
+services:
+  llm-local-monitor:
+    build: .
+    container_name: llm-local-monitor
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3788}:3000"
+    env_file:
+      - .env
+    volumes:
+      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro

@@ -1,0 +1,13 @@
+services:
+  llm-local-monitor:
+    build:
+      context: https://github.com/george7979/llm-local-monitor.git#main  # update if forked
+      dockerfile: Dockerfile
+      no_cache: true
+    pull_policy: build
+    container_name: llm-local-monitor
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3788}:3000"
+    env_file:
+      - .env

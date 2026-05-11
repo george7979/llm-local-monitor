@@ -1,0 +1,15 @@
+{
+  "name": "llm-local-monitor",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "undici": "^6.21.1"
+  }
+}
