@@ -13,7 +13,7 @@ Dashboard do monitorowania lokalnego serwera LLM opartego na **TrueNAS CE** z ka
 
 Monitor działa jako kontener Docker na maszynie z Dockge i odpytuje serwer GPU przez SSH.
 
-![Screenshot](pics/llm-local-monitor.png)
+![Screenshot](pics/llm-local-monitor.png?v=2)
 
 ## Panele
 
