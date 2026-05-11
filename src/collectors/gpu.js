@@ -10,6 +10,8 @@ const QUERY = [
   'memory.total',
   'temperature.gpu',
   'power.draw',
+  'pcie.link.gen.current',
+  'pcie.link.width.current',
 ].join(',');
 
 export function getGpuStatus() {
@@ -26,7 +28,7 @@ export function getGpuStatus() {
     );
 
     const gpus = output.split('\n').filter(Boolean).map(line => {
-      const [index, busId, name, utilization, memUsed, memTotal, temperature, powerDraw] =
+      const [index, busId, name, utilization, memUsed, memTotal, temperature, powerDraw, pcieGen, pcieWidth] =
         line.split(', ').map(s => s.trim());
       return {
         index: parseInt(index) || 0,
@@ -37,6 +39,8 @@ export function getGpuStatus() {
         memTotal: parseInt(memTotal) || 0,
         temperature: parseInt(temperature) || 0,
         powerDraw: parseFloat(powerDraw) || 0,
+        pcieGen: parseInt(pcieGen) || 0,
+        pcieWidth: parseInt(pcieWidth) || 0,
         hasOllama: ollamaBusIds.has(busId),
       };
     });
