@@ -173,7 +173,8 @@ button:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ── OLLAMA TABLE ──────────────────────────── */
 
-table { width: 100%; border-collapse: collapse; }
+#ollama-content { overflow-x: auto; }
+table { width: max-content; min-width: 100%; border-collapse: collapse; }
 
 thead th {
   text-align: left; padding: 0 14px 10px 0;
