@@ -3,31 +3,31 @@
 **Version:** 1.1
 **Date:** 2026-05-10
 **Author:** Jerzy Maczewski
-**Purpose:** Webowy dashboard do monitorowania serwera GPU z Ollamą
+**Purpose:** Web dashboard for monitoring a GPU server running Ollama
 
 ---
 
 ## Executive Summary
 
-Dashboard zastępuje ręczne SSH-owanie na serwer GPU (`$LLM_HOST`) w celu sprawdzenia stanu załadowanych modeli LLM, wykorzystania GPU i alokacji pamięci RAM. Udostępnia też przyciski sterowania zasilaniem (wybudź/wyłącz) i restartowania usługi Ollama — bez konieczności otwierania terminala.
+The dashboard replaces manual SSH-ing to the GPU server (`$LLM_HOST`) to check the state of loaded LLM models, GPU utilization, and RAM allocation. It also provides power control buttons (wake/shut down) and Ollama service restart — without opening a terminal.
 
 ---
 
 ## Problem Statement
 
-### Obecne wyzwania
+### Current challenges
 
-- Sprawdzenie załadowanych modeli wymaga ręcznego logowania do konsoli TrueNAS App
-- Monitorowanie GPU wymaga dedykowanego okna terminala z `watch -n 2 nvidia-smi`
-- Podgląd podziału pamięci RAM wymaga wejścia do dashboardu TrueNAS UI
-- Wybudzenie serwera wymaga znajomości komendy IPMI i adresu BMC
-- Brak scentralizowanego widoku stanu serwera LLM
+- Checking loaded models requires manually logging into the TrueNAS App console
+- GPU monitoring requires a dedicated terminal window running `watch -n 2 nvidia-smi`
+- Viewing RAM breakdown requires navigating to the TrueNAS UI dashboard
+- Waking the server requires knowing the IPMI command and BMC address
+- No centralized view of LLM server state
 
-### Kontekst
+### Context
 
-- Serwer GPU bywa uśpiony poza sesjami LLM — wybudzanie przez IPMI
-- Maszyna dostępna tylko w sieci lokalnej
-- Jedynym użytkownikiem jest właściciel
+- The GPU server is often asleep between LLM sessions — woken via IPMI
+- Machine is accessible only on the local network
+- The sole user is the owner
 
 ---
 
@@ -35,65 +35,65 @@ Dashboard zastępuje ręczne SSH-owanie na serwer GPU (`$LLM_HOST`) w celu spraw
 
 ### Primary User
 
-Właściciel/operator — jedyna osoba używająca narzędzia. Potrzebuje szybkiego wglądu w stan serwera przed uruchomieniem sesji LLM i w jej trakcie, bez otwierania osobnych terminali.
+Owner/operator — the only person using the tool. Needs a quick view of server state before and during an LLM session, without opening separate terminals.
 
 ---
 
 ## Functional Requirements
 
-### FR1: Monitoring w czasie rzeczywistym
+### FR1: Real-time monitoring
 
-- **FR1.1** Wyświetl stan hosta (online/offline)
-- **FR1.2** Wyświetl listę aktywnie załadowanych modeli LLM z parametrami (rozmiar, kwantyzacja, użycie GPU/CPU, kontekst, czas wygaśnięcia)
-- **FR1.3** Wyświetl statystyki GPU: utylizacja, VRAM, temperatura, pobór mocy
-- **FR1.4** Wyświetl rozkład pamięci RAM: wolna / ZFS ARC / usługi
-- **FR1.5** Wyświetl statystyki kontenera Ollama: CPU%, RAM, Block I/O, Network, status aplikacji, wersja, dostępność aktualizacji
-- **FR1.6** Auto-odświeżanie co 5 sekund bez ingerencji użytkownika
+- **FR1.1** Display host status (online/offline)
+- **FR1.2** Display list of actively loaded LLM models with parameters (size, quantization, GPU/CPU usage, context, expiry time)
+- **FR1.3** Display GPU stats: utilization, VRAM, temperature, power draw
+- **FR1.4** Display RAM breakdown: free / ZFS ARC / services
+- **FR1.5** Display Ollama container stats: CPU%, RAM, Block I/O, Network, app status, version, update availability
+- **FR1.6** Auto-refresh every 5 seconds without user interaction
 
-### FR2: Sterowanie serwerem
+### FR2: Server control
 
-- **FR2.1** Przycisk **Wake** — zdalnie włącza serwer przez BMC
-- **FR2.2** Przycisk **Wyłącz** — gracefully wyłącza serwer
-- **FR2.3** Przycisk **Restart Ollama** — restartuje usługę Ollama bez restartu serwera
-- **FR2.4** Przyciski aktywne/nieaktywne zależnie od stanu hosta
+- **FR2.1** **Wake** button — remotely powers on the server via BMC
+- **FR2.2** **Shut down** button — gracefully shuts down the server
+- **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
+- **FR2.4** Buttons enabled/disabled based on host state
 
-### FR3: Dostępność
+### FR3: Accessibility
 
-- **FR3.1** Brak autoryzacji — narzędzie internal, dostęp z sieci lokalnej
-- **FR3.2** Brak ekspozycji publicznej — tylko sieć lokalna
+- **FR3.1** No authentication — internal tool, accessed from local network
+- **FR3.2** No public exposure — local network only
 
 ---
 
 ## Non-functional Requirements
 
-- **NFR1** Czas odpowiedzi dashboardu < 1 s gdy host online
-- **NFR2** Gdy host offline: panel zaktualizowany w < 5 s
-- **NFR3** Single-page — działa w każdej nowoczesnej przeglądarce bez instalacji
-- **NFR4** Docker container — restart: unless-stopped, działa po restarcie hosta Dockge
+- **NFR1** Dashboard response time < 1 s when host is online
+- **NFR2** When host is offline: panel updated in < 5 s
+- **NFR3** Single-page — works in any modern browser without installation
+- **NFR4** Docker container — restart: unless-stopped, survives Dockge host restarts
 
 ---
 
 ## Success Metrics
 
-- **M1** Brak potrzeby otwierania terminala SSH do sprawdzenia stanu serwera LLM
-- **M2** Czas do informacji "czy model załadowany" < 5 s od otwarcia przeglądarki
-- **M3** Wake/Wyłącz/Restart Ollama działa z dashboardu bez dodatkowych czynności
+- **M1** No need to open an SSH terminal to check LLM server state
+- **M2** Time to "is the model loaded?" information < 5 s from opening the browser
+- **M3** Wake/Shut down/Restart Ollama works from the dashboard without additional steps
 
 ---
 
 ## Constraints & Assumptions
 
-- **C1** Dostępność: monitor działa tylko z sieci lokalnej
-- **C2** Serwer GPU musi mieć autoryzowany klucz SSH dla konta administracyjnego
-- **A1** Serwer GPU jest dostępny przez SSH gdy jest włączony
-- **A2** Sterowniki NVIDIA są zainstalowane na hoście TrueNAS CE
+- **C1** Availability: monitor works on local network only
+- **C2** GPU server must have an authorized SSH key for the admin account
+- **A1** GPU server is reachable via SSH when powered on
+- **A2** NVIDIA drivers are installed on the TrueNAS CE host
 
 ---
 
 ## Out of Scope (v1)
 
-- Historia metryk / wykresy (v2)
-- Notyfikacje push (email, Telegram)
-- Monitorowanie innych hostów
-- Ekspozycja publiczna
-- Streaming logów systemowych
+- Historical metrics / charts (v2)
+- Push notifications (email, Telegram)
+- Monitoring other hosts
+- Public exposure
+- System log streaming

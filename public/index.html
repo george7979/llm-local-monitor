@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,7 +19,7 @@
   <div class="header-right">
     <div class="host-pill" id="host-pill">
       <span class="pill-dot" id="pill-dot"></span>
-      <span id="pill-label">łączenie...</span>
+      <span id="pill-label">connecting...</span>
     </div>
     <span class="last-update" id="last-updated">—</span>
   </div>
@@ -29,7 +29,7 @@
   <div class="top-row">
 
     <div class="card" id="card-status">
-      <div class="card-label">SERWER</div>
+      <div class="card-label">SERVER</div>
       <div class="status-main">
         <div class="status-ring" id="status-ring">
           <div class="status-ring-dot"></div>
@@ -42,11 +42,11 @@
       <div class="action-list">
         <button id="btn-wake" onclick="action('wake')" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-          Wybudź serwer
+          Wake server
         </button>
         <button id="btn-sleep" onclick="action('sleep')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          Wyłącz serwer
+          Shut down
         </button>
         <button id="btn-restart" onclick="action('restart-ollama')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.15-7.36"/></svg>
@@ -57,26 +57,26 @@
     </div>
 
     <div class="card" id="card-memory">
-      <div class="card-label">PAMIĘĆ RAM</div>
-      <div id="memory-content"><span class="dim-text">Ładowanie...</span></div>
+      <div class="card-label">RAM</div>
+      <div id="memory-content"><span class="dim-text">Loading...</span></div>
     </div>
 
     <div class="card" id="card-ollama-app">
       <div class="card-label">OLLAMA APP</div>
-      <div id="ollama-app-content"><span class="dim-text">Ładowanie...</span></div>
+      <div id="ollama-app-content"><span class="dim-text">Loading...</span></div>
     </div>
 
   </div>
 
   <div class="card" id="card-ollama">
-    <div class="card-label">ZAŁADOWANE MODELE</div>
-    <div id="ollama-content"><span class="dim-text">Ładowanie...</span></div>
+    <div class="card-label">LOADED MODELS</div>
+    <div id="ollama-content"><span class="dim-text">Loading...</span></div>
   </div>
 
   <div class="card" id="card-gpu">
     <div class="card-label">GPU</div>
     <div class="gpu-grid" id="gpu-content">
-      <span class="dim-text">Ładowanie...</span>
+      <span class="dim-text">Loading...</span>
     </div>
   </div>
 </main>
