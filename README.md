@@ -27,6 +27,21 @@ Monitor działa jako kontener Docker na maszynie z Dockge i odpytuje serwer GPU 
 
 ---
 
+## Kompatybilność sprzętowa
+
+Sterowanie zasilaniem (Wake/Wyłącz) domyślnie używa **ipmitool z IPMI v2.0** (Supermicro i kompatybilne). Dla innych platform ustaw `WAKE_CMD` / `SLEEP_CMD` w `.env`:
+
+| Sprzęt | Konfiguracja |
+|--------|-------------|
+| Supermicro / IPMI v2.0 | ✅ Domyślnie — nic nie zmieniaj |
+| IPMI v1.5 | `IPMI_INTERFACE=lan` |
+| Dell iDRAC | `WAKE_CMD=racadm ...` |
+| HP iLO | `WAKE_CMD=curl ... Redfish API` |
+
+Gotowe przykłady komend dla każdej platformy znajdziesz w `.env.example`.
+
+---
+
 ## Dlaczego SSH, nie TrueNAS API?
 
 Dane takie jak cgroup (CPU%/RAM kontenera), `nvidia-smi` (GPU) i `/proc/meminfo` (ZFS) żyją bezpośrednio w systemie plików hosta TrueNAS — nie są dostępne przez REST API. SSH daje dostęp do wszystkiego przez jeden mechanizm auth.
