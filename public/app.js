@@ -167,7 +167,7 @@ function renderGpu(data) {
     badges.appendChild(el('span', tempCls, `${g.temperature}°C`));
     badges.appendChild(el('span', 'badge', `${g.powerDraw}W`));
     if (g.hasOllama) badges.appendChild(el('span', 'badge-ollama', 'OLLAMA'));
-    if (g.pcieGen && g.pcieWidth) badges.appendChild(el('span', 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`));
+    if (g.pcieGen && g.pcieWidth) badges.appendChild(el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`));
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
     card.appendChild(badges);
 
