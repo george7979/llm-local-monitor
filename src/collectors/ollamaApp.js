@@ -82,7 +82,7 @@ export function getOllamaAppStats() {
 
     return {
       ...base,
-      cpu:    { pct: cpuPct },
+      cpu:    { pct: cpuPct, cores: nproc },
       memory: { used: memUsed, max: memMax },
       io:     { read: ioRead, write: ioWrite },
       network: { rx: netRx, tx: netTx },
