@@ -218,6 +218,12 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 12px;
 }
+.badge-ollama {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: .08em; color: #00c896;
+  background: rgba(0,200,150,.08); border: 1px solid rgba(0,200,150,.25);
+  padding: 2px 6px; border-radius: 3px;
+}
 .gpu-idx {
   font-family: var(--mono); font-size: 10px; color: var(--dim);
   background: var(--border); padding: 2px 7px; border-radius: 3px;
