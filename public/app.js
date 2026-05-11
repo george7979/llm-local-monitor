@@ -9,6 +9,10 @@ function el(tag, cls, text) {
   return e;
 }
 
+// ── State ─────────────────────────────────────────────────────────────
+
+let restartingUntil = 0;
+
 // ── API ───────────────────────────────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
@@ -200,7 +204,11 @@ function renderOllamaApp(data) {
   wrap.textContent = '';
 
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
-  if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
+  if (data.error) {
+    const msg = Date.now() < restartingUntil ? 'Restarting...' : data.error;
+    wrap.appendChild(el('span', Date.now() < restartingUntil ? 'dim-text' : 'error-badge', msg));
+    return;
+  }
 
   // Status row
   const statusRow = el('div', 'app-status-row');
@@ -358,6 +366,8 @@ async function action(name) {
     'restart-ollama': 'Restart Ollama? Loaded models will be unloaded.',
   }[name];
   if (confirmMsg && !confirm(confirmMsg)) return;
+
+  if (name === 'restart-ollama') restartingUntil = Date.now() + 20_000;
 
   const msg = document.getElementById('action-msg');
   msg.textContent = { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...';
