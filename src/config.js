@@ -14,6 +14,9 @@ export const cfg = {
   ipmiHost: process.env.IPMI_HOST,
   ipmiUser: process.env.IPMI_USER || 'ADMIN',
   ipmiPass: process.env.IPMI_PASS,
+  ipmiInterface: process.env.IPMI_INTERFACE || 'lanplus',
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || `http://${process.env.LLM_HOST}:11434`,
   ollamaAppName: process.env.OLLAMA_APP_NAME || 'ollama',
+  wakeCmd: process.env.WAKE_CMD || null,
+  sleepCmd: process.env.SLEEP_CMD || null,
 };
