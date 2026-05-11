@@ -3,7 +3,7 @@ import { cfg } from '../config.js';
 
 export function sleepServer() {
   return new Promise((resolve, reject) => {
-    // TrueNAS Scale servers don't support suspend — graceful ACPI shutdown via IPMI
+    // TrueNAS CE servers don't support suspend — graceful ACPI shutdown via IPMI
     const args = [
       '-I', 'lanplus',
       '-H', cfg.ipmiHost,

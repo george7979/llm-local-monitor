@@ -86,7 +86,7 @@ Właściciel/operator — jedyna osoba używająca narzędzia. Potrzebuje szybki
 - **C1** Dostępność: monitor działa tylko z sieci lokalnej
 - **C2** Serwer GPU musi mieć autoryzowany klucz SSH dla konta administracyjnego
 - **A1** Serwer GPU jest dostępny przez SSH gdy jest włączony
-- **A2** Sterowniki NVIDIA są zainstalowane na hoście TrueNAS Scale
+- **A2** Sterowniki NVIDIA są zainstalowane na hoście TrueNAS CE
 
 ---
 

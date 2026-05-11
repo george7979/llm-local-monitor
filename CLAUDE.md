@@ -62,7 +62,7 @@ Dashboard do monitorowania serwera TrueNAS z GPU i Ollamą (host z env `LLM_HOST
 - **SSH key** — w kontenerze `/root/.ssh/id_ed25519` (dekodowany z `SSH_PRIVATE_KEY_B64` przez `entrypoint.sh`)
 - **OLLAMA_APP_NAME** — domyślnie `ollama`; zmień jeśli TrueNAS App ma inną nazwę
 - **IPMI_PASS** — wymagany w `.env`; credentials w `.env` NIE w kodzie
-- **nvidia-smi** — na hoście TrueNAS Scale; może wymagać weryfikacji dostępności
+- **nvidia-smi** — na hoście TrueNAS CE; może wymagać weryfikacji dostępności
 - **ZFS arcstats** — `/proc/spl/kstat/zfs/arcstats`; jeśli brak → memory.arc = 0
 - **CPU%** — podzielone przez `nproc` żeby zgadzało się z wyświetlaniem TrueNAS (% całości CPU)
 

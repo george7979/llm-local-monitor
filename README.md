@@ -1,12 +1,12 @@
 # llm-local-monitor
 
-Dashboard do monitorowania lokalnego serwera LLM opartego na **TrueNAS Scale** z kartami GPU i Ollamą.
+Dashboard do monitorowania lokalnego serwera LLM opartego na **TrueNAS CE** z kartami GPU i Ollamą.
 
 ### Stack docelowy
 
 | Komponent | Rola |
 |-----------|------|
-| **TrueNAS Scale** (`$LLM_HOST`) | Serwer GPU — hostuje Ollamę jako TrueNAS App (Docker container) |
+| **TrueNAS CE** (`$LLM_HOST`) | Serwer GPU — hostuje Ollamę jako TrueNAS App (Docker container) |
 | **Ollama** | Framework do uruchamiania lokalnych modeli LLM (llama, qwen, gemma itp.) |
 | **IPMI/BMC** (`$IPMI_HOST`) | Zdalne zarządzanie zasilaniem serwera (wake/shutdown) |
 | **Dockge** (`<DOCKGE_HOST>`) | Orchestrator Docker — tu działa ten monitor |
