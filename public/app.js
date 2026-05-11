@@ -28,9 +28,9 @@ async function pollAll() {
     renderGpu(data.gpu);
     renderMemory(data.memory);
     document.getElementById('last-updated').textContent =
-      new Date().toLocaleTimeString('pl-PL');
+      new Date().toLocaleTimeString();
   } catch (e) {
-    document.getElementById('last-updated').textContent = 'błąd połączenia';
+    document.getElementById('last-updated').textContent = 'connection error';
   }
 }
 
@@ -68,12 +68,12 @@ function renderStatus(host) {
     ring.className  = 'status-ring dead';
     dot.className   = 'pill-dot dead';
     label.textContent = 'Offline';
-    text.textContent  = 'Wyłączony';
+    text.textContent  = 'Powered off';
     wake.disabled = false; sleep.disabled = true; rst.disabled = true;
   }
 
   sub.textContent = host.checkedAt
-    ? 'sprawdzono ' + new Date(host.checkedAt).toLocaleTimeString('pl-PL') : '—';
+    ? 'checked ' + new Date(host.checkedAt).toLocaleTimeString() : '—';
 }
 
 // ── Ollama ────────────────────────────────────────────────────────────
@@ -82,17 +82,17 @@ function renderOllama(data) {
   const wrap = document.getElementById('ollama-content');
   wrap.textContent = '';
 
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host niedostępny')); return; }
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
   if (!data.models?.length) {
-    wrap.appendChild(el('span', 'dim-text', 'Brak załadowanych modeli'));
+    wrap.appendChild(el('span', 'dim-text', 'No models loaded'));
     return;
   }
 
   const table = document.createElement('table');
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
-  ['Model', 'Params', 'Quant', 'Procesor', 'VRAM', 'Ctx', 'Wygasa'].forEach(h => {
+  ['Model', 'Params', 'Quant', 'Processor', 'VRAM', 'Ctx', 'Expires'].forEach(h => {
     hr.appendChild(el('th', null, h));
   });
   thead.appendChild(hr);
@@ -101,7 +101,7 @@ function renderOllama(data) {
   const tbody = document.createElement('tbody');
   for (const m of data.models) {
     const tr = document.createElement('tr');
-    const expires = m.expiresAt ? new Date(m.expiresAt).toLocaleTimeString('pl-PL') : '—';
+    const expires = m.expiresAt ? new Date(m.expiresAt).toLocaleTimeString() : '—';
     const vram    = m.sizeVram  ? gb(m.sizeVram) + ' GB' : '—';
     const ctx     = m.contextLength ? Math.round(m.contextLength / 1000) + 'k' : '—';
 
@@ -138,9 +138,9 @@ function renderGpu(data) {
   const wrap = document.getElementById('gpu-content');
   wrap.textContent = '';
 
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host niedostępny')); return; }
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
-  if (!data.gpus?.length) { wrap.appendChild(el('span', 'dim-text', 'Brak GPU')); return; }
+  if (!data.gpus?.length) { wrap.appendChild(el('span', 'dim-text', 'No GPUs found')); return; }
 
   data.gpus.forEach((g) => {
     const card = el('div', 'gpu-card');
@@ -199,7 +199,7 @@ function renderOllamaApp(data) {
   const wrap = document.getElementById('ollama-app-content');
   wrap.textContent = '';
 
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host niedostępny')); return; }
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
 
   // Status row
@@ -279,7 +279,7 @@ function renderMemory(data) {
   const wrap = document.getElementById('memory-content');
   wrap.textContent = '';
 
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host niedostępny')); return; }
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
 
   const { total, free, arc, services } = data;
@@ -287,9 +287,9 @@ function renderMemory(data) {
   const CIRC = 2 * Math.PI * R;
 
   const segments = [
-    { label: 'USŁUGI',  bytes: services, color: '#2e88ff' },
-    { label: 'ZFS ARC', bytes: arc,      color: '#f59e0b' },
-    { label: 'WOLNE',   bytes: free,     color: '#00c896' },
+    { label: 'SERVICES', bytes: services, color: '#2e88ff' },
+    { label: 'ZFS ARC',  bytes: arc,      color: '#f59e0b' },
+    { label: 'FREE',     bytes: free,     color: '#00c896' },
   ];
 
   // ── SVG donut ──
@@ -353,15 +353,21 @@ function renderMemory(data) {
 // ── Actions ───────────────────────────────────────────────────────────
 
 async function action(name) {
+  const confirmMsg = {
+    sleep: 'Shut down the server?',
+    'restart-ollama': 'Restart Ollama? Loaded models will be unloaded.',
+  }[name];
+  if (confirmMsg && !confirm(confirmMsg)) return;
+
   const msg = document.getElementById('action-msg');
-  msg.textContent = { wake: 'Wybudzanie...', sleep: 'Wyłączanie...', 'restart-ollama': 'Restartowanie...' }[name] || '...';
+  msg.textContent = { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...';
   try {
     const res = await apiFetch(`/api/${name}`, { method: 'POST' });
     msg.textContent = res.ok
-      ? ({ wake: 'Wysłano — boot ~3.5 min', sleep: 'Wyłączanie...', 'restart-ollama': 'Restart zlecony' }[name] || 'OK')
-      : 'Błąd: ' + (res.error || '?');
+      ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-ollama': 'Restart queued' }[name] || 'OK')
+      : 'Error: ' + (res.error || '?');
   } catch (e) {
-    msg.textContent = 'Błąd: ' + e.message;
+    msg.textContent = 'Error: ' + e.message;
   }
   setTimeout(() => { msg.textContent = ''; }, 8000);
 }
