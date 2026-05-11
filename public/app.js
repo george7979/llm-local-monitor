@@ -163,7 +163,8 @@ function renderGpu(data) {
 
     // Badges
     const badges = el('div', 'gpu-badges');
-    badges.appendChild(el('span', g.temperature > 75 ? 'badge warn' : 'badge', `${g.temperature}°C`));
+    const tempCls = g.temperature >= 85 ? 'badge hot' : g.temperature >= 75 ? 'badge warn' : 'badge';
+    badges.appendChild(el('span', tempCls, `${g.temperature}°C`));
     badges.appendChild(el('span', 'badge', `${g.powerDraw}W`));
     if (g.hasOllama) badges.appendChild(el('span', 'badge-ollama', 'OLLAMA'));
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
