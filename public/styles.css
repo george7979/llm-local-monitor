@@ -277,8 +277,8 @@ tbody tr:last-child td { border-bottom: none; }
   filter: drop-shadow(0 0 12px rgba(0,200,150,.1));
   height: 100%;
   width: auto;
-  min-height: 140px;
-  max-height: 260px;
+  min-height: 120px;
+  max-height: 180px;
 }
 
 .mem-donut-svg circle { transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1), stroke-dasharray .6s cubic-bezier(.4,0,.2,1); }
