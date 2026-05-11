@@ -83,7 +83,7 @@ function renderOllama(data) {
   wrap.textContent = '';
 
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
-  if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
+  if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
   if (!data.models?.length) {
     wrap.appendChild(el('span', 'dim-text', 'No models loaded'));
     return;
@@ -139,7 +139,7 @@ function renderGpu(data) {
   wrap.textContent = '';
 
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
-  if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
+  if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
   if (!data.gpus?.length) { wrap.appendChild(el('span', 'dim-text', 'No GPUs found')); return; }
 
   data.gpus.forEach((g) => {
@@ -280,7 +280,7 @@ function renderMemory(data) {
   wrap.textContent = '';
 
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
-  if (data.error) { wrap.appendChild(el('span', 'error-badge', data.error)); return; }
+  if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
 
   const { total, free, arc, services } = data;
   const R    = 68;
