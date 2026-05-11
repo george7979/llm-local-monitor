@@ -222,6 +222,7 @@ function renderOllamaApp(data) {
   const cpuCard = el('div', 'app-stat');
   cpuCard.appendChild(el('div', 'app-stat-label', 'CPU'));
   cpuCard.appendChild(el('div', 'app-stat-val', `${cpuPct}%`));
+  cpuCard.appendChild(el('div', 'app-stat-sub', data.cpu?.cores ? `${data.cpu.cores} cores` : ''));
   const cpuBarRow = el('div', 'app-bar-row');
   cpuBarRow.appendChild(makeGpuBar('', '', cpuPct,
     cpuPct > 80 ? 'fill-high' : cpuPct > 40 ? 'fill-mid' : 'fill-low'));
