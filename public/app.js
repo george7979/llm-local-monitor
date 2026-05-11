@@ -367,7 +367,7 @@ async function action(name) {
   }[name];
   if (confirmMsg && !confirm(confirmMsg)) return;
 
-  if (name === 'restart-ollama') restartingUntil = Date.now() + 20_000;
+  if (name === 'restart-ollama') restartingUntil = Date.now() + 5_000;
 
   const msg = document.getElementById('action-msg');
   msg.textContent = { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...';
