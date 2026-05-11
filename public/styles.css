@@ -275,6 +275,10 @@ tbody tr:last-child td { border-bottom: none; }
 .mem-donut-svg {
   flex-shrink: 0;
   filter: drop-shadow(0 0 12px rgba(0,200,150,.1));
+  height: 100%;
+  width: auto;
+  min-height: 140px;
+  max-height: 260px;
 }
 
 .mem-donut-svg circle { transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1), stroke-dasharray .6s cubic-bezier(.4,0,.2,1); }
@@ -328,7 +332,7 @@ tbody tr:last-child td { border-bottom: none; }
 #card-memory #memory-content {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
 }
 
