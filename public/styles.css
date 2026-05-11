@@ -270,6 +270,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 2px 7px; border-radius: 3px;
 }
 .badge.warn { color: var(--amber); border-color: rgba(245,158,11,.3); }
+.badge.hot  { color: var(--red);   border-color: rgba(240,68,56,.3); }
 .badge-bus  { color: var(--dim); font-size: 9px; letter-spacing: .02em; }
 
 /* ── MEMORY DONUT ──────────────────────────── */
