@@ -293,7 +293,7 @@ function renderMemory(data) {
   ];
 
   // ── SVG donut ──
-  const svg = svgEl('svg', { viewBox: '0 0 200 200', width: 185, height: 185, class: 'mem-donut-svg' });
+  const svg = svgEl('svg', { viewBox: '0 0 200 200', class: 'mem-donut-svg' });
 
   // Track
   svg.appendChild(svgEl('circle', { cx: 100, cy: 100, r: R, fill: 'none', stroke: 'rgba(255,255,255,.05)', 'stroke-width': 28 }));
