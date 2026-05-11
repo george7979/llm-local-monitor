@@ -208,7 +208,7 @@ function renderOllamaApp(data) {
   const stateBadge = el('span', `app-state-badge ${stateText === 'RUNNING' ? 'running' : 'stopped'}`, stateText || '—');
   const version = el('span', 'app-version', `v${data.version || '?'}`);
   const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update' : 'ok'}`,
-    data.upgradeAvailable ? '⬆ Update' : '✓ OK');
+    data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
   statusRow.appendChild(stateBadge);
   statusRow.appendChild(version);
   statusRow.appendChild(updateBadge);
