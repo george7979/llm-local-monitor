@@ -68,6 +68,10 @@ Copy `.env.example` → `.env` and fill in:
 | `IPMI_PASS` | IPMI password | ✅ |
 | `HOST_PORT` | Port on Dockge host (default: 3788) | optional |
 | `OLLAMA_BASE_URL` | Ollama API URL (default: `http://$LLM_HOST:11434`) | optional |
+| `OLLAMA_APP_NAME` | TrueNAS App name for Ollama (default: `ollama`) | optional |
+| `IPMI_INTERFACE` | ipmitool interface (default: `lanplus`, use `lan` for IPMI v1.5) | optional |
+| `WAKE_CMD` | Custom wake command — overrides ipmitool default | optional |
+| `SLEEP_CMD` | Custom shutdown command — overrides ipmitool default | optional |
 | `SSH_KEY_PATH` | Key path inside container (default: `/root/.ssh/id_ed25519`) | optional |
 
 Generate `SSH_PRIVATE_KEY_B64`:
