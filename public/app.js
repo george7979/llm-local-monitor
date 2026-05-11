@@ -165,6 +165,7 @@ function renderGpu(data) {
     const badges = el('div', 'gpu-badges');
     badges.appendChild(el('span', g.temperature > 75 ? 'badge warn' : 'badge', `${g.temperature}°C`));
     badges.appendChild(el('span', 'badge', `${g.powerDraw}W`));
+    if (g.hasOllama) badges.appendChild(el('span', 'badge-ollama', 'OLLAMA'));
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
     card.appendChild(badges);
 

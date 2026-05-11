@@ -14,9 +14,17 @@ const QUERY = [
 
 export function getGpuStatus() {
   return cached('gpu', 2_000, async () => {
-    const output = await sshExec(
-      `nvidia-smi --query-gpu=${QUERY} --format=csv,noheader,nounits`
+    const [output, appsOutput] = await Promise.all([
+      sshExec(`nvidia-smi --query-gpu=${QUERY} --format=csv,noheader,nounits`),
+      sshExec(`nvidia-smi --query-compute-apps=gpu_bus_id,process_name --format=csv,noheader,nounits 2>/dev/null || echo ""`),
+    ]);
+
+    const ollamaBusIds = new Set(
+      appsOutput.split('\n')
+        .filter(l => l.toLowerCase().includes('ollama'))
+        .map(l => l.split(',')[0].trim())
     );
+
     const gpus = output.split('\n').filter(Boolean).map(line => {
       const [index, busId, name, utilization, memUsed, memTotal, temperature, powerDraw] =
         line.split(', ').map(s => s.trim());
@@ -29,6 +37,7 @@ export function getGpuStatus() {
         memTotal: parseInt(memTotal) || 0,
         temperature: parseInt(temperature) || 0,
         powerDraw: parseFloat(powerDraw) || 0,
+        hasOllama: ollamaBusIds.has(busId),
       };
     });
     return { gpus };
