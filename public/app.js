@@ -353,6 +353,12 @@ function renderMemory(data) {
 // ── Actions ───────────────────────────────────────────────────────────
 
 async function action(name) {
+  const confirmMsg = {
+    sleep: 'Shut down the server?',
+    'restart-ollama': 'Restart Ollama? Loaded models will be unloaded.',
+  }[name];
+  if (confirmMsg && !confirm(confirmMsg)) return;
+
   const msg = document.getElementById('action-msg');
   msg.textContent = { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...';
   try {
