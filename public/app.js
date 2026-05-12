@@ -34,16 +34,19 @@ async function pollAll() {
   }
 }
 
-// Load server hostname for branding
+// Load server config, then start polling
 fetch('/api/config').then(r => r.json()).then(c => {
   const h = c.llmHost || '—';
   const el = document.getElementById('brand-host');
   if (el) el.textContent = h;
   document.title = `LLM Monitor — ${h}`;
-}).catch(() => {});
-
-setInterval(pollAll, 5000);
-pollAll();
+  const intervalMs = ((c.pollIntervalSec || 5) * 1000);
+  setInterval(pollAll, intervalMs);
+  pollAll();
+}).catch(() => {
+  setInterval(pollAll, 5000);
+  pollAll();
+});
 
 // ── Status ────────────────────────────────────────────────────────────
 
