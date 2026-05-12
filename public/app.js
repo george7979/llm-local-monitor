@@ -528,15 +528,15 @@ async function checkForUpdate() {
     const data = await apiFetch('/api/check-update');
     const vBadge = document.getElementById('app-version');
     const uBadge = document.getElementById('update-badge');
-    if (!uBadge) return;
+    if (!vBadge || !uBadge) return;
     if (data.updateAvailable && data.latest) {
-      uBadge.textContent = `↑ v${data.latest}`;
+      uBadge.textContent = `v${data.current} → v${data.latest}`;
       uBadge.href = data.releaseUrl || '#';
       uBadge.style.display = '';
-      if (vBadge) vBadge.style.display = 'none';
+      vBadge.style.display = 'none';
     } else {
       uBadge.style.display = 'none';
-      if (vBadge) vBadge.style.display = '';
+      vBadge.style.display = '';
     }
   } catch {}
 }
