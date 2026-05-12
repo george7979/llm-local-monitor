@@ -387,6 +387,27 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 5px 12px; border-radius: var(--r-sm);
 }
 
+/* ── OLLAMA APP vertical fill ──────────────── */
+
+#card-ollama-app {
+  display: flex;
+  flex-direction: column;
+}
+#ollama-app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+#ollama-app-content .app-stat-grid {
+  flex: 1;
+  grid-auto-rows: 1fr;
+}
+#ollama-app-content .app-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
 /* ── MEMORY CARD vertical centering ───────── */
 
 #card-memory {
