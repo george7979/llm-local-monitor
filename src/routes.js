@@ -9,6 +9,7 @@ import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
 import { sleepServer } from './actions/sleep.js';
 import { restartOllama } from './actions/restartOllama.js';
+import { checkUpdate } from './actions/checkUpdate.js';
 
 export const router = Router();
 
@@ -51,6 +52,10 @@ router.get('/gpu', async (_req, res) => {
 
 router.get('/memory', async (_req, res) => {
   res.json(await safeCollect(getMemoryStatus));
+});
+
+router.get('/check-update', async (_req, res) => {
+  res.json(await checkUpdate());
 });
 
 router.post('/wake', async (_req, res) => {
