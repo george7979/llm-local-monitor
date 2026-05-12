@@ -115,6 +115,18 @@ main {
   color: var(--dim); margin-bottom: 16px;
 }
 
+.card-label-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 12px; gap: 8px; overflow: hidden;
+}
+.card-label-row .card-label { margin-bottom: 0; flex-shrink: 0; }
+
+.ollama-image-tag {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+
 /* ── STATUS CARD ───────────────────────────── */
 
 .status-main {
@@ -407,13 +419,7 @@ tbody tr:last-child td { border-bottom: none; }
   background: rgba(240,68,56,.1); border: 1px solid rgba(240,68,56,.3); color: var(--red);
 }
 
-.app-version { font-family: var(--mono); font-size: 11px; color: var(--dim); flex-shrink: 0; }
-
-.app-image-label {
-  font-family: var(--mono); font-size: 10px; color: var(--dim);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  flex: 1; min-width: 0;
-}
+.app-version { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
 .app-update-badge {
   font-family: var(--mono); font-size: 10px;

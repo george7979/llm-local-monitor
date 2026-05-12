@@ -218,12 +218,10 @@ function renderOllamaApp(data) {
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
   statusRow.appendChild(stateBadge);
   statusRow.appendChild(version);
-  if (data.image) {
-    const imgLabel = el('span', 'app-image-label', data.image);
-    imgLabel.title = data.image;
-    statusRow.appendChild(imgLabel);
-  }
   statusRow.appendChild(updateBadge);
+
+  const imageEl = document.getElementById('ollama-app-image');
+  if (imageEl) { imageEl.textContent = data.image || ''; imageEl.title = data.image || ''; }
   wrap.appendChild(statusRow);
 
   // Stats grid
