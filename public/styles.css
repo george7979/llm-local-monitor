@@ -387,6 +387,17 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 5px 12px; border-radius: var(--r-sm);
 }
 
+/* ── SERVER CARD vertical fill ─────────────── */
+
+#card-status {
+  display: flex;
+  flex-direction: column;
+}
+#card-status .action-list {
+  flex: 1;
+  justify-content: center;
+}
+
 /* ── OLLAMA APP vertical fill ──────────────── */
 
 #card-ollama-app {
