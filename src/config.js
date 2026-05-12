@@ -21,6 +21,7 @@ export const cfg = {
     ? process.env.NETWORK_PHYS_IFACES.split(',').map(s => s.trim()).filter(Boolean)
     : null,
   networkHostIface: process.env.NETWORK_HOST_IFACE || null,
+  networkLinkSpeedMbit: parseInt(process.env.NETWORK_LINK_SPEED_MBIT, 10) || 0,
   wakeCmd: process.env.WAKE_CMD || null,
   sleepCmd: process.env.SLEEP_CMD || null,
   pollIntervalSec: Math.max(1, parseInt(process.env.POLL_INTERVAL_SEC, 10) || 5),
