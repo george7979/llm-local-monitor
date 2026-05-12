@@ -328,17 +328,30 @@ tbody tr:last-child td { border-bottom: none; }
 
 .net-port { margin-bottom: 10px; }
 
-.net-port-name {
-  font-size: 10px; font-weight: 600; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--dim); margin-bottom: 6px;
-  font-family: var(--mono);
+.net-port-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 5px;
 }
+
+.net-port-name {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--dim);
+}
+
+.net-port-vals { display: flex; gap: 10px; }
+
+.net-val-rx { font-family: var(--mono); font-size: 11px; color: #2e88ff; }
+.net-val-tx { font-family: var(--mono); font-size: 11px; color: #f59e0b; }
+
+.net-histogram { display: block; width: 100%; height: 72px; }
 
 .net-divider { height: 1px; background: var(--border); margin: 10px 0; }
 
 .net-bond {
   display: flex; justify-content: space-between; align-items: flex-start;
 }
+
+.net-bond-vals { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 
 .net-bond-label {
   font-family: var(--mono); font-size: 10px; color: var(--dim);

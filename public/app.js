@@ -360,60 +360,156 @@ function renderMemory(data) {
 
 // ── Network ───────────────────────────────────────────────────────────
 
+const NET_HIST_LEN = 40;
+const _netHistory  = {};
+const _netCanvases = {};
+let   _netBuilt    = false;
+
 function fmtMbps(v) {
-  if (v === 0) return '0 Mbit/s';
-  if (v < 0.1) return '<0.1 Mbit/s';
-  if (v >= 100) return `${Math.round(v)} Mbit/s`;
-  return `${v.toFixed(1)} Mbit/s`;
+  if (v >= 1000) return `${(v / 1000).toFixed(1)} Gbit/s`;
+  if (v >= 1)    return `${(v % 1 === 0 ? v : v.toFixed(1))} Mbit/s`;
+  const k = Math.round(v * 1000);
+  return k < 1 ? '< 1 kBit/s' : `${k} kBit/s`;
+}
+
+function _pushNetHistory(ports) {
+  for (const p of ports) {
+    if (!_netHistory[p.name]) _netHistory[p.name] = [];
+    _netHistory[p.name].push({ rx: p.rxMbps ?? 0, tx: p.txMbps ?? 0 });
+    if (_netHistory[p.name].length > NET_HIST_LEN) _netHistory[p.name].shift();
+  }
+}
+
+function _drawHistogram(canvas, history) {
+  const dpr  = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (!cssW || !cssH) return;
+
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const ctx  = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH, midY = Math.floor(H / 2);
+
+  const padded = [
+    ...Array(Math.max(0, NET_HIST_LEN - history.length)).fill({ rx: 0, tx: 0 }),
+    ...history,
+  ];
+
+  const maxMbps = Math.max(...padded.flatMap(h => [h.rx, h.tx]), 0.0001);
+  const useMbit = maxMbps >= 1;
+  const toU     = v => useMbit ? v : v * 1000;
+  const axisMax = toU(maxMbps);
+  const unit    = useMbit ? 'Mbit/s' : 'kBit/s';
+
+  ctx.clearRect(0, 0, W, H);
+
+  // center divider
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(0, midY, W, 1);
+
+  const gap  = 1;
+  const barW = Math.max(2, Math.floor((W - gap * (NET_HIST_LEN - 1)) / NET_HIST_LEN));
+  const step = barW + gap;
+  const maxH = midY - 3;
+
+  padded.forEach((pt, i) => {
+    const x   = i * step;
+    const rxH = Math.round((toU(pt.rx) / axisMax) * maxH);
+    const txH = Math.round((toU(pt.tx) / axisMax) * maxH);
+    if (rxH > 0) { ctx.fillStyle = '#2e88ff'; ctx.fillRect(x, midY - rxH, barW, rxH); }
+    if (txH > 0) { ctx.fillStyle = '#f59e0b'; ctx.fillRect(x, midY + 1, barW, txH); }
+  });
+
+  const axisLabel = axisMax < 10
+    ? `${axisMax.toFixed(1)} ${unit}` : `${Math.round(axisMax)} ${unit}`;
+  ctx.font      = `9px JetBrains Mono, monospace`;
+  ctx.fillStyle = 'rgba(74,102,128,0.75)';
+  ctx.textAlign = 'right';
+  ctx.fillText(axisLabel, W - 2, 10);
+}
+
+function _buildNetworkDOM(physPorts, bond, wrap) {
+  wrap.textContent = '';
+  physPorts.forEach((port, i) => {
+    if (i > 0) wrap.appendChild(el('div', 'net-divider'));
+    const div = el('div', 'net-port');
+    const hdr = el('div', 'net-port-header');
+    hdr.appendChild(el('span', 'net-port-name', port.name));
+    const pv = el('div', 'net-port-vals');
+    pv.appendChild(el('span', 'net-val-rx', ''));
+    pv.appendChild(el('span', 'net-val-tx', ''));
+    hdr.appendChild(pv);
+    div.appendChild(hdr);
+    const canvas = document.createElement('canvas');
+    canvas.className = 'net-histogram';
+    _netCanvases[port.name] = canvas;
+    div.appendChild(canvas);
+    wrap.appendChild(div);
+  });
+
+  if (bond) {
+    wrap.appendChild(el('div', 'net-divider'));
+    const row = el('div', 'net-bond');
+    row.appendChild(el('span', 'net-bond-label', `${bond.name} (host)`));
+    const bv = el('div', 'net-bond-vals');
+    bv.appendChild(el('span', 'net-bond-val', ''));
+    bv.appendChild(el('span', 'net-bond-val', ''));
+    row.appendChild(bv);
+    wrap.appendChild(row);
+  }
 }
 
 function renderNetwork(data) {
-  const card = document.getElementById('card-network');
-  const wrap = document.getElementById('network-content');
-
+  const card   = document.getElementById('card-network');
+  const wrap   = document.getElementById('network-content');
   const topRow = document.querySelector('.top-row');
+
   if (data === null) {
     card.style.display = 'none';
     topRow.classList.add('no-network');
+    _netBuilt = false;
     return;
   }
   card.style.display = '';
   topRow.classList.remove('no-network');
-  wrap.textContent = '';
 
-  if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
+  if (!data || data.error) {
+    if (!_netBuilt) { wrap.textContent = ''; wrap.appendChild(el('span', 'dim-text', data?.error ? 'Temporarily unavailable' : 'Host unavailable')); }
+    return;
+  }
 
   const physPorts = (data.ports || []).filter(p => !p.isHost);
   const bond      = (data.ports || []).find(p => p.isHost);
 
-  physPorts.forEach((port, i) => {
-    if (i > 0) wrap.appendChild(el('div', 'net-divider'));
+  _pushNetHistory(physPorts);
 
-    const div = el('div', 'net-port');
-    div.appendChild(el('div', 'net-port-name', port.name));
+  if (!_netBuilt) {
+    _buildNetworkDOM(physPorts, bond, wrap);
+    _netBuilt = true;
+  }
 
-    const maxMbps = port.maxMbps || 1000;
-    const rxPct = Math.min(100, (port.rxMbps / maxMbps) * 100);
-    const txPct = Math.min(100, (port.txMbps / maxMbps) * 100);
-    const rxCls = rxPct > 80 ? 'fill-high' : rxPct > 40 ? 'fill-mid' : 'fill-low';
-
-    div.appendChild(makeGpuBar('↓ RX', fmtMbps(port.rxMbps), rxPct, rxCls));
-    div.appendChild(makeGpuBar('↑ TX', fmtMbps(port.txMbps), txPct, 'fill-vram'));
-
-    wrap.appendChild(div);
+  physPorts.forEach(port => {
+    const canvas = _netCanvases[port.name];
+    if (!canvas) return;
+    const div = canvas.closest('.net-port');
+    if (div) {
+      const rxEl = div.querySelector('.net-val-rx');
+      const txEl = div.querySelector('.net-val-tx');
+      if (rxEl) rxEl.textContent = `↓ ${fmtMbps(port.rxMbps)}`;
+      if (txEl) txEl.textContent = `↑ ${fmtMbps(port.txMbps)}`;
+    }
+    _drawHistogram(canvas, _netHistory[port.name] || []);
   });
 
-  if (bond && physPorts.length) {
-    wrap.appendChild(el('div', 'net-divider'));
-    const bondRow = el('div', 'net-bond');
-    bondRow.appendChild(el('span', 'net-bond-label', `${bond.name} (host)`));
-    const vals = el('div', null);
-    vals.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:2px';
-    vals.appendChild(el('span', 'net-bond-val', `↓ ${fmtMbps(bond.rxMbps)}`));
-    vals.appendChild(el('span', 'net-bond-val', `↑ ${fmtMbps(bond.txMbps)}`));
-    bondRow.appendChild(vals);
-    wrap.appendChild(bondRow);
+  if (bond) {
+    const bv = wrap.querySelector('.net-bond-vals');
+    if (bv) {
+      const [rxEl, txEl] = bv.querySelectorAll('.net-bond-val');
+      if (rxEl) rxEl.textContent = `↓ ${fmtMbps(bond.rxMbps)}`;
+      if (txEl) txEl.textContent = `↑ ${fmtMbps(bond.txMbps)}`;
+    }
   }
 }
 
