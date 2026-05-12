@@ -5,6 +5,7 @@ import { getOllamaStatus } from './collectors/ollama.js';
 import { getOllamaAppStats } from './collectors/ollamaApp.js';
 import { getGpuStatus } from './collectors/gpu.js';
 import { getMemoryStatus } from './collectors/memory.js';
+import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
 import { sleepServer } from './actions/sleep.js';
 import { restartOllama } from './actions/restartOllama.js';
@@ -21,18 +22,19 @@ function safeCollect(fn) {
 
 router.get('/status', async (_req, res) => {
   const host = await safeCollect(getHostStatus);
-  let ollama = null, gpu = null, memory = null;
+  let ollama = null, gpu = null, memory = null, network = null;
 
   if (host.alive) {
-    [ollama, gpu, memory] = await Promise.all([
+    [ollama, gpu, memory, network] = await Promise.all([
       safeCollect(getOllamaStatus),
       safeCollect(getGpuStatus),
       safeCollect(getMemoryStatus),
+      safeCollect(getNetworkStatus),
     ]);
   }
 
   const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;
-  res.json({ host, ollama, ollamaApp, gpu, memory });
+  res.json({ host, ollama, ollamaApp, gpu, memory, network });
 });
 
 router.get('/ollama', async (_req, res) => {
