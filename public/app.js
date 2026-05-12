@@ -218,6 +218,11 @@ function renderOllamaApp(data) {
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
   statusRow.appendChild(stateBadge);
   statusRow.appendChild(version);
+  if (data.image) {
+    const imgLabel = el('span', 'app-image-label', data.image);
+    imgLabel.title = data.image;
+    statusRow.appendChild(imgLabel);
+  }
   statusRow.appendChild(updateBadge);
   wrap.appendChild(statusRow);
 
@@ -265,14 +270,6 @@ function renderOllamaApp(data) {
 
   wrap.appendChild(grid);
 
-  // Image
-  if (data.image) {
-    const img = el('div', null);
-    img.style.cssText = 'margin-top:10px; font-family:var(--mono); font-size:10px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
-    img.textContent = data.image;
-    img.title = data.image;
-    wrap.appendChild(img);
-  }
 }
 
 // ── Memory ────────────────────────────────────────────────────────────
