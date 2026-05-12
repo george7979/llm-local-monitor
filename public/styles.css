@@ -292,19 +292,18 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── MEMORY DONUT ──────────────────────────── */
 
 .mem-donut-wrap {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  overflow: hidden;
+  display: flex; align-items: stretch; justify-content: center; gap: 16px;
+  overflow: hidden; flex: 1;
 }
 
 .mem-donut-svg {
   flex-shrink: 1;
   filter: drop-shadow(0 0 12px rgba(0,200,150,.1));
-  height: auto;
+  height: 100%;
   width: auto;
   min-width: 90px;
   max-width: 210px;
   min-height: 90px;
-  max-height: 210px;
 }
 
 .mem-donut-svg circle { transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1), stroke-dasharray .6s cubic-bezier(.4,0,.2,1); }
@@ -312,6 +311,7 @@ tbody tr:last-child td { border-bottom: none; }
 .mem-legend {
   display: flex; flex-direction: column; gap: 9px;
   min-width: 0; flex-shrink: 1;
+  justify-content: space-evenly;
 }
 
 .mem-legend-item {
