@@ -13,7 +13,7 @@ import { restartOllama } from './actions/restartOllama.js';
 export const router = Router();
 
 router.get('/config', (_req, res) => {
-  res.json({ llmHost: cfg.llmHost, pollIntervalSec: cfg.pollIntervalSec });
+  res.json({ llmHost: cfg.llmHost, pollIntervalSec: cfg.pollIntervalSec, version: cfg.version });
 });
 
 function safeCollect(fn) {

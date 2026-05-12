@@ -41,6 +41,8 @@ fetch('/api/config').then(r => r.json()).then(c => {
   const el = document.getElementById('brand-host');
   if (el) el.textContent = h;
   document.title = `LLM Monitor — ${h}`;
+  const vEl = document.getElementById('app-version');
+  if (vEl && c.version) vEl.textContent = `v${c.version}`;
   const intervalMs = ((c.pollIntervalSec || 5) * 1000);
   setInterval(pollAll, intervalMs);
   pollAll();

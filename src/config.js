@@ -1,4 +1,6 @@
 import { config } from 'dotenv';
+import { readFileSync } from 'fs';
+const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
 
 config({ path: '.env', override: true });
 
@@ -8,6 +10,7 @@ for (const key of required) {
 }
 
 export const cfg = {
+  version,
   llmHost: process.env.LLM_HOST,
   llmUser: process.env.LLM_USER,
   sshKeyPath: process.env.SSH_KEY_PATH || '/root/.ssh/id_ed25519',
