@@ -43,6 +43,8 @@ fetch('/api/config').then(r => r.json()).then(c => {
   document.title = `LLM Monitor — ${h}`;
   const vEl = document.getElementById('app-version');
   if (vEl && c.version) vEl.textContent = `v${c.version}`;
+  checkForUpdate();
+  setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
   const intervalMs = ((c.pollIntervalSec || 5) * 1000);
   setInterval(pollAll, intervalMs);
   pollAll();
@@ -517,6 +519,23 @@ function renderNetwork(data) {
       if (txEl) txEl.textContent = `↑ ${fmtMbps(bond.txMbps)}`;
     }
   }
+}
+
+// ── Update check ─────────────────────────────────────────────────────
+
+async function checkForUpdate() {
+  try {
+    const data = await apiFetch('/api/check-update');
+    const badge = document.getElementById('update-badge');
+    if (!badge) return;
+    if (data.updateAvailable && data.latest) {
+      badge.textContent = `↑ v${data.latest}`;
+      badge.href = data.releaseUrl || '#';
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch {}
 }
 
 // ── Actions ───────────────────────────────────────────────────────────

@@ -81,10 +81,30 @@ header {
 
 .last-update { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
+.github-link {
+  display: flex; align-items: center;
+  color: var(--dim); transition: color .2s;
+}
+.github-link:hover { color: var(--text); }
+.github-link svg { width: 16px; height: 16px; }
+
 .app-version-badge {
   font-family: var(--mono); font-size: 11px; color: var(--dim);
   background: var(--card); border: 1px solid var(--border);
   padding: 2px 8px; border-radius: 4px;
+}
+
+.update-available-badge {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--amber); background: rgba(245,158,11,.08);
+  border: 1px solid rgba(245,158,11,.3);
+  padding: 2px 8px; border-radius: 4px;
+  text-decoration: none; cursor: pointer;
+  animation: update-pulse 2.5s ease-in-out infinite;
+}
+@keyframes update-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .55; }
 }
 
 /* ── LAYOUT ────────────────────────────────── */
