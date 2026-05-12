@@ -2,9 +2,10 @@ import { sshExec } from '../lib/ssh.js';
 import { cached } from '../lib/cache.js';
 import { cfg } from '../config.js';
 
-const MAX_MBPS = 125; // 1 Gbit/s in MB/s
-
-let _prev = null;
+let _prev   = null;
+let _speeds = null;
+let _speedsTs = 0;
+const SPEED_TTL = 30_000;
 
 function parseProcNetDev(text, ifaces) {
   const result = {};
@@ -18,9 +19,29 @@ function parseProcNetDev(text, ifaces) {
   return result;
 }
 
-function toMBps(bytesDelta, dtSec) {
+function toMbps(bytesDelta, dtSec) {
   if (dtSec <= 0 || bytesDelta < 0) return 0;
-  return +(bytesDelta / dtSec / 1_000_000).toFixed(2);
+  return +(bytesDelta * 8 / dtSec / 1_000_000).toFixed(1);
+}
+
+async function readSpeeds(ifaces, fallback) {
+  if (_speeds && Date.now() - _speedsTs < SPEED_TTL) return _speeds;
+
+  const speeds = {};
+  try {
+    const cmd = `for i in ${ifaces.join(' ')}; do cat /sys/class/net/$i/speed 2>/dev/null || echo -1; done`;
+    const raw = await sshExec(cmd);
+    const values = raw.trim().split('\n').map(v => parseInt(v));
+    ifaces.forEach((name, i) => {
+      speeds[name] = (values[i] > 0) ? values[i] : fallback;
+    });
+  } catch {
+    ifaces.forEach(name => { speeds[name] = fallback; });
+  }
+
+  _speeds = speeds;
+  _speedsTs = Date.now();
+  return speeds;
 }
 
 export function getNetworkStatus() {
@@ -29,28 +50,37 @@ export function getNetworkStatus() {
 
   if (!physIfaces) return Promise.resolve(null);
 
-  const allIfaces = hostIface ? [...physIfaces, hostIface] : physIfaces;
+  const allIfaces  = hostIface ? [...physIfaces, hostIface] : physIfaces;
+  const fallback   = cfg.networkLinkSpeedMbit || 1000;
 
   return cached('network', 2_000, async () => {
     const now = Date.now();
-    const raw = await sshExec('cat /proc/net/dev');
+    const [raw, speeds] = await Promise.all([
+      sshExec('cat /proc/net/dev'),
+      readSpeeds(allIfaces, fallback),
+    ]);
     const cur = parseProcNetDev(raw, allIfaces);
 
     if (!_prev) {
       _prev = { ts: now, data: cur };
-      return { ports: allIfaces.map(p => ({ name: p, isHost: p === hostIface, rxMBps: 0, txMBps: 0, maxMBps: MAX_MBPS })) };
+      return {
+        ports: allIfaces.map(p => ({
+          name: p, isHost: p === hostIface,
+          rxMbps: 0, txMbps: 0, maxMbps: speeds[p] || fallback,
+        })),
+      };
     }
 
     const dt = (now - _prev.ts) / 1000;
     const ports = allIfaces.map(p => {
-      const c  = cur[p]   || { rx: 0, tx: 0 };
+      const c  = cur[p]        || { rx: 0, tx: 0 };
       const pv = _prev.data[p] || { rx: 0, tx: 0 };
       return {
         name:    p,
         isHost:  p === hostIface,
-        rxMBps:  toMBps(c.rx - pv.rx, dt),
-        txMBps:  toMBps(c.tx - pv.tx, dt),
-        maxMBps: MAX_MBPS,
+        rxMbps:  toMbps(c.rx - pv.rx, dt),
+        txMbps:  toMbps(c.tx - pv.tx, dt),
+        maxMbps: speeds[p] || fallback,
       };
     });
 

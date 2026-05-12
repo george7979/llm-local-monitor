@@ -360,11 +360,11 @@ function renderMemory(data) {
 
 // ── Network ───────────────────────────────────────────────────────────
 
-function fmtMBps(v) {
-  if (v === 0) return '0 MB/s';
-  if (v < 0.1) return '<0.1 MB/s';
-  if (v >= 100) return `${Math.round(v)} MB/s`;
-  return `${v.toFixed(1)} MB/s`;
+function fmtMbps(v) {
+  if (v === 0) return '0 Mbit/s';
+  if (v < 0.1) return '<0.1 Mbit/s';
+  if (v >= 100) return `${Math.round(v)} Mbit/s`;
+  return `${v.toFixed(1)} Mbit/s`;
 }
 
 function renderNetwork(data) {
@@ -387,13 +387,13 @@ function renderNetwork(data) {
     const div = el('div', 'net-port');
     div.appendChild(el('div', 'net-port-name', port.name));
 
-    const maxMBps = port.maxMBps || 125;
-    const rxPct = Math.min(100, (port.rxMBps / maxMBps) * 100);
-    const txPct = Math.min(100, (port.txMBps / maxMBps) * 100);
+    const maxMbps = port.maxMbps || 1000;
+    const rxPct = Math.min(100, (port.rxMbps / maxMbps) * 100);
+    const txPct = Math.min(100, (port.txMbps / maxMbps) * 100);
     const rxCls = rxPct > 80 ? 'fill-high' : rxPct > 40 ? 'fill-mid' : 'fill-low';
 
-    div.appendChild(makeGpuBar('↓ RX', fmtMBps(port.rxMBps), rxPct, rxCls));
-    div.appendChild(makeGpuBar('↑ TX', fmtMBps(port.txMBps), txPct, 'fill-vram'));
+    div.appendChild(makeGpuBar('↓ RX', fmtMbps(port.rxMbps), rxPct, rxCls));
+    div.appendChild(makeGpuBar('↑ TX', fmtMbps(port.txMbps), txPct, 'fill-vram'));
 
     wrap.appendChild(div);
   });
@@ -404,8 +404,8 @@ function renderNetwork(data) {
     bondRow.appendChild(el('span', 'net-bond-label', `${bond.name} (host)`));
     const vals = el('div', null);
     vals.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:2px';
-    vals.appendChild(el('span', 'net-bond-val', `↓ ${fmtMBps(bond.rxMBps)}`));
-    vals.appendChild(el('span', 'net-bond-val', `↑ ${fmtMBps(bond.txMBps)}`));
+    vals.appendChild(el('span', 'net-bond-val', `↓ ${fmtMbps(bond.rxMbps)}`));
+    vals.appendChild(el('span', 'net-bond-val', `↑ ${fmtMbps(bond.txMbps)}`));
     bondRow.appendChild(vals);
     wrap.appendChild(bondRow);
   }
