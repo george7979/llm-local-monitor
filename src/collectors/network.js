@@ -21,7 +21,7 @@ function parseProcNetDev(text, ifaces) {
 
 function toMbps(bytesDelta, dtSec) {
   if (dtSec <= 0 || bytesDelta < 0) return 0;
-  return +(bytesDelta * 8 / dtSec / 1_000_000).toFixed(1);
+  return +(bytesDelta * 8 / dtSec / 1_000_000).toFixed(4);
 }
 
 async function readSpeeds(ifaces, fallback) {
