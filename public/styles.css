@@ -317,7 +317,7 @@ tbody tr:last-child td { border-bottom: none; }
   text-transform: uppercase; color: var(--dim); margin-bottom: 3px;
 }
 
-.mem-legend-vals { display: flex; align-items: baseline; gap: 8px; }
+.mem-legend-vals { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 
 .mem-legend-gb {
   font-family: var(--mono); font-size: 13px; font-weight: 600; color: #dde8f0;
