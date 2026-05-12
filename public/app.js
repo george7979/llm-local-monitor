@@ -27,6 +27,7 @@ async function pollAll() {
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
     renderMemory(data.memory);
+    renderNetwork(data.network);
     document.getElementById('last-updated').textContent =
       new Date().toLocaleTimeString();
   } catch (e) {
@@ -355,6 +356,55 @@ function renderMemory(data) {
   container.appendChild(svg);
   container.appendChild(legend);
   wrap.appendChild(container);
+}
+
+// ── Network ───────────────────────────────────────────────────────────
+
+function fmtMBps(v) {
+  if (v === 0) return '0 MB/s';
+  if (v < 0.1) return '<0.1 MB/s';
+  if (v >= 100) return `${Math.round(v)} MB/s`;
+  return `${v.toFixed(1)} MB/s`;
+}
+
+function renderNetwork(data) {
+  const wrap = document.getElementById('network-content');
+  wrap.textContent = '';
+
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
+  if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
+
+  const physPorts = (data.ports || []).filter(p => p.name !== 'br0');
+  const bond      = (data.ports || []).find(p => p.name === 'br0');
+
+  physPorts.forEach((port, i) => {
+    if (i > 0) wrap.appendChild(el('div', 'net-divider'));
+
+    const div = el('div', 'net-port');
+    div.appendChild(el('div', 'net-port-name', port.name));
+
+    const maxMBps = port.maxMBps || 125;
+    const rxPct = Math.min(100, (port.rxMBps / maxMBps) * 100);
+    const txPct = Math.min(100, (port.txMBps / maxMBps) * 100);
+    const rxCls = rxPct > 80 ? 'fill-high' : rxPct > 40 ? 'fill-mid' : 'fill-low';
+
+    div.appendChild(makeGpuBar('↓ RX', fmtMBps(port.rxMBps), rxPct, rxCls));
+    div.appendChild(makeGpuBar('↑ TX', fmtMBps(port.txMBps), txPct, 'fill-vram'));
+
+    wrap.appendChild(div);
+  });
+
+  if (bond && physPorts.length) {
+    wrap.appendChild(el('div', 'net-divider'));
+    const bondRow = el('div', 'net-bond');
+    bondRow.appendChild(el('span', 'net-bond-label', 'br0 (host)'));
+    const vals = el('div', null);
+    vals.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:2px';
+    vals.appendChild(el('span', 'net-bond-val', `↓ ${fmtMBps(bond.rxMBps)}`));
+    vals.appendChild(el('span', 'net-bond-val', `↑ ${fmtMBps(bond.txMBps)}`));
+    bondRow.appendChild(vals);
+    wrap.appendChild(bondRow);
+  }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────
