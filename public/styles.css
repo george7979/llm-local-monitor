@@ -131,7 +131,7 @@ main {
 
 .status-main {
   display: flex; align-items: center; gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .status-ring {
@@ -163,11 +163,11 @@ main {
   font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 2px;
 }
 
-.action-list { display: flex; flex-direction: column; gap: 6px; }
+.action-list { display: flex; flex-direction: column; gap: 4px; }
 
 button {
   display: flex; align-items: center; gap: 8px;
-  width: 100%; padding: 8px 12px;
+  width: 100%; padding: 6px 12px;
   background: transparent;
   border: 1px solid var(--border2);
   border-radius: var(--r-sm);
@@ -181,7 +181,7 @@ button:disabled { opacity: .3; cursor: not-allowed; }
 #btn-sleep:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
 
 .action-msg {
-  margin-top: 10px; min-height: 14px;
+  margin-top: 6px; min-height: 14px;
   font-family: var(--mono); font-size: 11px; color: var(--dim);
   line-height: 1.5;
 }
