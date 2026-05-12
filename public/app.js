@@ -291,7 +291,7 @@ function renderMemory(data) {
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
 
   const { total, free, arc, services } = data;
-  const R    = 82;
+  const R    = 80;
   const CIRC = 2 * Math.PI * R;
 
   const segments = [
@@ -304,7 +304,7 @@ function renderMemory(data) {
   const svg = svgEl('svg', { viewBox: '0 0 200 200', class: 'mem-donut-svg' });
 
   // Track
-  svg.appendChild(svgEl('circle', { cx: 100, cy: 100, r: R, fill: 'none', stroke: 'rgba(255,255,255,.05)', 'stroke-width': 28 }));
+  svg.appendChild(svgEl('circle', { cx: 100, cy: 100, r: R, fill: 'none', stroke: 'rgba(255,255,255,.05)', 'stroke-width': 38 }));
 
   // Counter-clockwise: mirror horizontally around x=100
   const ccw = svgEl('g', { transform: 'translate(200,0) scale(-1,1)' });
@@ -314,7 +314,7 @@ function renderMemory(data) {
     if (len < 0.5) return;
     const circle = svgEl('circle', {
       cx: 100, cy: 100, r: R,
-      fill: 'none', stroke: color, 'stroke-width': 26,
+      fill: 'none', stroke: color, 'stroke-width': 36,
       'stroke-dasharray': `${len} ${CIRC}`,
       'stroke-dashoffset': -offset,
       'stroke-linecap': 'butt',
