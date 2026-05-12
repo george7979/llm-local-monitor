@@ -17,6 +17,10 @@ export const cfg = {
   ipmiInterface: process.env.IPMI_INTERFACE || 'lanplus',
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || `http://${process.env.LLM_HOST}:11434`,
   ollamaAppName: process.env.OLLAMA_APP_NAME || 'ollama',
+  networkPhysIfaces: process.env.NETWORK_PHYS_IFACES
+    ? process.env.NETWORK_PHYS_IFACES.split(',').map(s => s.trim()).filter(Boolean)
+    : null,
+  networkHostIface: process.env.NETWORK_HOST_IFACE || null,
   wakeCmd: process.env.WAKE_CMD || null,
   sleepCmd: process.env.SLEEP_CMD || null,
   pollIntervalSec: Math.max(1, parseInt(process.env.POLL_INTERVAL_SEC, 10) || 5),

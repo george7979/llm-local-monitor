@@ -368,14 +368,18 @@ function fmtMBps(v) {
 }
 
 function renderNetwork(data) {
+  const card = document.getElementById('card-network');
   const wrap = document.getElementById('network-content');
+
+  if (data === null) { card.style.display = 'none'; return; }
+  card.style.display = '';
   wrap.textContent = '';
 
-  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
+  if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
 
-  const physPorts = (data.ports || []).filter(p => p.name !== 'br0');
-  const bond      = (data.ports || []).find(p => p.name === 'br0');
+  const physPorts = (data.ports || []).filter(p => !p.isHost);
+  const bond      = (data.ports || []).find(p => p.isHost);
 
   physPorts.forEach((port, i) => {
     if (i > 0) wrap.appendChild(el('div', 'net-divider'));
@@ -397,7 +401,7 @@ function renderNetwork(data) {
   if (bond && physPorts.length) {
     wrap.appendChild(el('div', 'net-divider'));
     const bondRow = el('div', 'net-bond');
-    bondRow.appendChild(el('span', 'net-bond-label', 'br0 (host)'));
+    bondRow.appendChild(el('span', 'net-bond-label', `${bond.name} (host)`));
     const vals = el('div', null);
     vals.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:2px';
     vals.appendChild(el('span', 'net-bond-val', `↓ ${fmtMBps(bond.rxMBps)}`));
