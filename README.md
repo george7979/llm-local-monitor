@@ -13,7 +13,7 @@ Dashboard for monitoring a local LLM server running **TrueNAS CE** with GPU card
 
 The monitor runs as a Docker container on the Dockge host and queries the GPU server over SSH.
 
-![Screenshot](pics/dashboard-eng-4.png)
+![Screenshot](pics/dashboard-eng-5.png)
 
 ## Panels
 
