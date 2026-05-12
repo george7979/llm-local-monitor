@@ -371,8 +371,14 @@ function renderNetwork(data) {
   const card = document.getElementById('card-network');
   const wrap = document.getElementById('network-content');
 
-  if (data === null) { card.style.display = 'none'; return; }
+  const topRow = document.querySelector('.top-row');
+  if (data === null) {
+    card.style.display = 'none';
+    topRow.classList.add('no-network');
+    return;
+  }
   card.style.display = '';
+  topRow.classList.remove('no-network');
   wrap.textContent = '';
 
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
