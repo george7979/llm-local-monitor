@@ -81,18 +81,14 @@ header {
 
 .last-update { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
-.github-link {
-  display: flex; align-items: center;
-  color: var(--dim); transition: color .2s;
-}
-.github-link:hover { color: var(--text); }
-.github-link svg { width: 16px; height: 16px; }
 
 .app-version-badge {
   font-family: var(--mono); font-size: 11px; color: var(--dim);
   background: var(--card); border: 1px solid var(--border);
   padding: 2px 8px; border-radius: 4px;
+  text-decoration: none;
 }
+.app-version-badge:hover { border-color: var(--border2); color: var(--text); }
 
 .update-available-badge {
   font-family: var(--mono); font-size: 11px;

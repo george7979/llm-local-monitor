@@ -526,14 +526,17 @@ function renderNetwork(data) {
 async function checkForUpdate() {
   try {
     const data = await apiFetch('/api/check-update');
-    const badge = document.getElementById('update-badge');
-    if (!badge) return;
+    const vBadge = document.getElementById('app-version');
+    const uBadge = document.getElementById('update-badge');
+    if (!uBadge) return;
     if (data.updateAvailable && data.latest) {
-      badge.textContent = `↑ v${data.latest}`;
-      badge.href = data.releaseUrl || '#';
-      badge.style.display = '';
+      uBadge.textContent = `↑ v${data.latest}`;
+      uBadge.href = data.releaseUrl || '#';
+      uBadge.style.display = '';
+      if (vBadge) vBadge.style.display = 'none';
     } else {
-      badge.style.display = 'none';
+      uBadge.style.display = 'none';
+      if (vBadge) vBadge.style.display = '';
     }
   } catch {}
 }
