@@ -281,6 +281,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .mem-donut-wrap {
   display: flex; align-items: center; justify-content: center; gap: 16px;
+  overflow: hidden;
 }
 
 .mem-donut-svg {
