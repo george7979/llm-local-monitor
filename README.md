@@ -21,6 +21,7 @@ The monitor runs as a Docker container on the Dockge host and queries the GPU se
 |-------|-------|-------------|
 | **Server** | Alive/Offline + Wake/Shut down/Restart Ollama | TCP probe, IPMI |
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
+| **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
 | **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
 | **Loaded models** | Model, size, quant, GPU/CPU split, context | Ollama REST API `:11434/api/ps` |
 | **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge on cards with active process | SSH → `nvidia-smi` |
@@ -39,6 +40,32 @@ Power management (Wake/Shut down) uses **ipmitool with IPMI v2.0** by default (S
 | HP iLO | `WAKE_CMD=curl ... Redfish API` |
 
 Ready-to-use command examples for each platform are in `.env.example`.
+
+---
+
+## LAN Ports widget (optional)
+
+The widget is **hidden by default**. To enable it, set `NETWORK_PHYS_IFACES` in `.env`.
+
+**Step 1 — find your interface names:**
+
+```bash
+ssh truenas_admin@<LLM_HOST> "cat /proc/net/dev"
+```
+
+Look for physical ports (e.g. `eno1`, `eno2`, `enp3s0`, `eth0`).
+
+**Step 2 — add to `.env`:**
+
+```env
+NETWORK_PHYS_IFACES=eno1,eno2        # required — shown as individual bar charts
+NETWORK_HOST_IFACE=br0               # optional — aggregate summary line
+                                     # (br0 on TrueNAS, bond0 on plain Linux, or leave empty)
+```
+
+Link speed is **auto-detected** from `/sys/class/net/<iface>/speed` (Mbit/s) and used as the Y-axis maximum. Override with `NETWORK_LINK_SPEED_MBIT=1000` if auto-detect returns wrong values (e.g. some virtual NICs).
+
+The widget shows a **40-sample bidirectional histogram** per port — RX in blue (top), TX in amber (bottom) — with a dynamic scale that switches between kBit/s and Mbit/s depending on traffic level.
 
 ---
 
