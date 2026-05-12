@@ -19,4 +19,5 @@ export const cfg = {
   ollamaAppName: process.env.OLLAMA_APP_NAME || 'ollama',
   wakeCmd: process.env.WAKE_CMD || null,
   sleepCmd: process.env.SLEEP_CMD || null,
+  pollIntervalSec: Math.max(1, parseInt(process.env.POLL_INTERVAL_SEC, 10) || 5),
 };
