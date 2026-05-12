@@ -81,6 +81,12 @@ header {
 
 .last-update { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
+.app-version-badge {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  background: var(--card); border: 1px solid var(--border);
+  padding: 2px 8px; border-radius: 4px;
+}
+
 /* ── LAYOUT ────────────────────────────────── */
 
 main {
