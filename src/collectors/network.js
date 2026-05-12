@@ -64,6 +64,7 @@ export function getNetworkStatus() {
     if (!_prev) {
       _prev = { ts: now, data: cur };
       return {
+        ts: now,
         ports: allIfaces.map(p => ({
           name: p, isHost: p === hostIface,
           rxMbps: 0, txMbps: 0, maxMbps: speeds[p] || fallback,
@@ -85,6 +86,6 @@ export function getNetworkStatus() {
     });
 
     _prev = { ts: now, data: cur };
-    return { ports };
+    return { ts: now, ports };
   });
 }

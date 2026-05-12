@@ -364,6 +364,7 @@ const NET_HIST_LEN = 40;
 const _netHistory  = {};
 const _netCanvases = {};
 let   _netBuilt    = false;
+let   _netLastTs   = 0;
 
 function fmtMbps(v) {
   if (v >= 1000) return `${(v / 1000).toFixed(1)} Gbit/s`;
@@ -483,7 +484,10 @@ function renderNetwork(data) {
   const physPorts = (data.ports || []).filter(p => !p.isHost);
   const bond      = (data.ports || []).find(p => p.isHost);
 
-  _pushNetHistory(physPorts);
+  if (data.ts && data.ts !== _netLastTs) {
+    _pushNetHistory(physPorts);
+    _netLastTs = data.ts;
+  }
 
   if (!_netBuilt) {
     _buildNetworkDOM(physPorts, bond, wrap);
