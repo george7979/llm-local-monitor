@@ -393,7 +393,7 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── OLLAMA APP PANEL ──────────────────────── */
 
 .app-status-row {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
 }
 
 .app-state-badge {
@@ -407,27 +407,33 @@ tbody tr:last-child td { border-bottom: none; }
   background: rgba(240,68,56,.1); border: 1px solid rgba(240,68,56,.3); color: var(--red);
 }
 
-.app-version { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.app-version { font-family: var(--mono); font-size: 11px; color: var(--dim); flex-shrink: 0; }
+
+.app-image-label {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0;
+}
 
 .app-update-badge {
   font-family: var(--mono); font-size: 10px;
-  padding: 2px 8px; border-radius: 4px; margin-left: auto;
+  padding: 2px 8px; border-radius: 4px; margin-left: auto; flex-shrink: 0;
 }
 .app-update-badge.ok     { background: rgba(0,200,150,.08); border: 1px solid rgba(0,200,150,.2); color: var(--green); }
 .app-update-badge.update { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber); }
 
 .app-stat-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
 }
 
 .app-stat {
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 10px 12px;
+  border-radius: var(--r-sm); padding: 7px 10px;
 }
 
 .app-stat-label {
   font-size: 9px; font-weight: 600; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--dim); margin-bottom: 6px;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 3px;
 }
 
 .app-stat-val {
@@ -438,7 +444,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 2px;
 }
 
-.app-bar-row { margin-top: 4px; }
+.app-bar-row { margin-top: 2px; }
 
 /* ── RESPONSIVE ────────────────────────────── */
 
