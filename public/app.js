@@ -22,7 +22,7 @@ async function apiFetch(path, opts = {}) {
 async function pollAll() {
   try {
     const data = await apiFetch('/api/status');
-    renderStatus(data.host);
+    renderStatus(data.host, data.ipmi);
     renderOllama(data.ollama);
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
@@ -55,7 +55,7 @@ fetch('/api/config').then(r => r.json()).then(c => {
 
 // ── Status ────────────────────────────────────────────────────────────
 
-function renderStatus(host) {
+function renderStatus(host, ipmi) {
   if (!host) return;
   const ring  = document.getElementById('status-ring');
   const dot   = document.getElementById('pill-dot');
@@ -66,16 +66,22 @@ function renderStatus(host) {
   const sleep = document.getElementById('btn-sleep');
   const rst   = document.getElementById('btn-restart');
 
+  // Header pill = IPMI availability
+  if (ipmi?.alive) {
+    dot.className  = 'pill-dot alive';
+    label.textContent = 'Online';
+  } else {
+    dot.className  = 'pill-dot dead';
+    label.textContent = 'Offline';
+  }
+
+  // SERVER card = SSH host availability
   if (host.alive) {
     ring.className  = 'status-ring alive';
-    dot.className   = 'pill-dot alive';
-    label.textContent = 'Online';
     text.textContent  = 'Online';
     wake.disabled = true; sleep.disabled = false; rst.disabled = false;
   } else {
     ring.className  = 'status-ring dead';
-    dot.className   = 'pill-dot dead';
-    label.textContent = 'Offline';
     text.textContent  = 'Powered off';
     wake.disabled = false; sleep.disabled = true; rst.disabled = true;
   }

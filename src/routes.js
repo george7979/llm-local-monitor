@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { cfg } from './config.js';
 import { getHostStatus } from './collectors/host.js';
+import { getIpmiStatus } from './collectors/ipmi.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getOllamaAppStats } from './collectors/ollamaApp.js';
 import { getGpuStatus } from './collectors/gpu.js';
@@ -23,6 +24,7 @@ function safeCollect(fn) {
 
 router.get('/status', async (_req, res) => {
   const host = await safeCollect(getHostStatus);
+  const ipmi = await safeCollect(getIpmiStatus);
   let ollama = null, gpu = null, memory = null, network = null;
 
   if (host.alive) {
@@ -35,7 +37,7 @@ router.get('/status', async (_req, res) => {
   }
 
   const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;
-  res.json({ host, ollama, ollamaApp, gpu, memory, network });
+  res.json({ host, ipmi, ollama, ollamaApp, gpu, memory, network });
 });
 
 router.get('/ollama', async (_req, res) => {
