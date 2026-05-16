@@ -344,7 +344,7 @@ function renderMemory(data) {
   const totalGb = gb(total);
   const centerVal = svgEl('text', { x: 100, y: 97, 'text-anchor': 'middle', fill: '#dde8f0', 'font-size': 20, 'font-family': 'JetBrains Mono', 'font-weight': 600 });
   centerVal.textContent = totalGb;
-  const centerUnit = svgEl('text', { x: 100, y: 115, 'text-anchor': 'middle', fill: '#4a6680', 'font-size': 11, 'font-family': 'JetBrains Mono' });
+  const centerUnit = svgEl('text', { x: 100, y: 115, 'text-anchor': 'middle', fill: '#6a8aaa', 'font-size': 11, 'font-family': 'JetBrains Mono' });
   centerUnit.textContent = 'GB';
   svg.appendChild(centerVal);
   svg.appendChild(centerUnit);
@@ -442,7 +442,7 @@ function _drawHistogram(canvas, history) {
   const axisLabel = axisMax < 10
     ? `${axisMax.toFixed(1)} ${unit}` : `${Math.round(axisMax)} ${unit}`;
   ctx.font      = `9px JetBrains Mono, monospace`;
-  ctx.fillStyle = 'rgba(74,102,128,0.75)';
+  ctx.fillStyle = 'rgba(106,138,170,0.85)';
   ctx.textAlign = 'right';
   ctx.fillText(axisLabel, W - 2, 10);
 }
