@@ -79,10 +79,10 @@ function renderStatus(host, ipmi) {
   // Header pill = IPMI availability
   if (ipmi?.alive) {
     dot.className  = 'pill-dot alive';
-    label.textContent = 'Online';
+    label.textContent = 'Reachable';
   } else {
     dot.className  = 'pill-dot dead';
-    label.textContent = 'Offline';
+    label.textContent = 'Unreachable';
   }
 
   // SERVER card = SSH host availability
