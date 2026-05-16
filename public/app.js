@@ -233,7 +233,6 @@ function renderOllamaApp(data) {
   const statusRow = el('div', 'app-status-row');
   const stateText = (data.state || '').toUpperCase();
   const stateBadge = el('span', `app-state-badge ${stateText === 'RUNNING' ? 'running' : 'stopped'}`, stateText || '—');
-  const version = el('span', 'app-version', `v${data.version || '?'}`);
   const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update clickable' : 'ok'}`,
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
   if (data.upgradeAvailable) {
@@ -241,7 +240,6 @@ function renderOllamaApp(data) {
     updateBadge.onclick = () => upgradeOllamaApp();
   }
   statusRow.appendChild(stateBadge);
-  statusRow.appendChild(version);
   statusRow.appendChild(updateBadge);
 
   const imageEl = document.getElementById('ollama-app-image');
