@@ -565,7 +565,7 @@ async function checkForUpdate() {
 
 async function upgradeOllamaApp() {
   if (!confirm('Upgrade Ollama in TrueNAS?\nOllama will be unavailable for a few minutes during the update.')) return;
-  const msg = document.getElementById('action-msg');
+  const msg = document.getElementById('ollama-upgrade-msg');
   msg.textContent = 'Upgrade started — Ollama will restart automatically...';
   try {
     const res = await apiFetch('/api/upgrade-ollama', { method: 'POST' });
