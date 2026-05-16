@@ -480,7 +480,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 2px 8px; border-radius: 4px; margin-left: auto; flex-shrink: 0;
 }
 .app-update-badge.ok     { background: rgba(0,200,150,.08); border: 1px solid rgba(0,200,150,.2); color: var(--green); }
-.app-update-badge.update { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber); }
+.app-update-badge.update { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber); animation: update-pulse 2.5s ease-in-out infinite; }
 .app-update-badge.clickable { cursor: pointer; }
 .app-update-badge.clickable:hover { background: rgba(245,158,11,.2); border-color: rgba(245,158,11,.5); }
 
