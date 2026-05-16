@@ -13,6 +13,7 @@ function probeTcp(host, port, timeoutMs) {
 
 export function getIpmiStatus() {
   return cached('ipmi', 2_000, async () => {
+    if (!cfg.ipmiHost) return { alive: false, checkedAt: new Date().toISOString() };
     const alive = await probeTcp(cfg.ipmiHost, 443, 4_000);
     return { alive, checkedAt: new Date().toISOString() };
   });

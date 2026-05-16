@@ -19,6 +19,16 @@ async function apiFetch(path, opts = {}) {
 
 // ── Polling ───────────────────────────────────────────────────────────
 
+function fmtUptime(sec) {
+  if (!sec || sec < 0) return '—';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `up ${d}d ${h}h`;
+  if (h > 0) return `up ${h}h ${m}m`;
+  return `up ${m}m`;
+}
+
 async function pollAll() {
   try {
     const data = await apiFetch('/api/status');
@@ -28,10 +38,10 @@ async function pollAll() {
     renderGpu(data.gpu);
     renderMemory(data.memory);
     renderNetwork(data.network);
-    document.getElementById('last-updated').textContent =
-      new Date().toLocaleTimeString();
+    document.getElementById('server-uptime').textContent =
+      fmtUptime(data.uptime?.seconds);
   } catch (e) {
-    document.getElementById('last-updated').textContent = 'connection error';
+    document.getElementById('server-uptime').textContent = '—';
   }
 }
 
@@ -39,7 +49,10 @@ async function pollAll() {
 fetch('/api/config').then(r => r.json()).then(c => {
   const h = c.llmHost || '—';
   const el = document.getElementById('brand-host');
-  if (el) el.textContent = h;
+  if (el) {
+    el.textContent = h;
+    if (c.llmHost) el.href = c.truenasUrl || `https://${c.llmHost}`;
+  }
   document.title = `LLM Monitor — ${h}`;
   const vEl = document.getElementById('app-version');
   if (vEl && c.version) vEl.textContent = `v${c.version}`;
@@ -69,10 +82,10 @@ function renderStatus(host, ipmi) {
   // Header pill = IPMI availability
   if (ipmi?.alive) {
     dot.className  = 'pill-dot alive';
-    label.textContent = 'Online';
+    label.textContent = 'Reachable';
   } else {
     dot.className  = 'pill-dot dead';
-    label.textContent = 'Offline';
+    label.textContent = 'Unreachable';
   }
 
   // SERVER card = SSH host availability
@@ -223,11 +236,13 @@ function renderOllamaApp(data) {
   const statusRow = el('div', 'app-status-row');
   const stateText = (data.state || '').toUpperCase();
   const stateBadge = el('span', `app-state-badge ${stateText === 'RUNNING' ? 'running' : 'stopped'}`, stateText || '—');
-  const version = el('span', 'app-version', `v${data.version || '?'}`);
-  const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update' : 'ok'}`,
+  const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update clickable' : 'ok'}`,
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
+  if (data.upgradeAvailable) {
+    updateBadge.title = 'Click to upgrade Ollama in TrueNAS';
+    updateBadge.onclick = () => upgradeOllamaApp();
+  }
   statusRow.appendChild(stateBadge);
-  statusRow.appendChild(version);
   statusRow.appendChild(updateBadge);
 
   const imageEl = document.getElementById('ollama-app-image');
@@ -334,7 +349,7 @@ function renderMemory(data) {
   const totalGb = gb(total);
   const centerVal = svgEl('text', { x: 100, y: 97, 'text-anchor': 'middle', fill: '#dde8f0', 'font-size': 20, 'font-family': 'JetBrains Mono', 'font-weight': 600 });
   centerVal.textContent = totalGb;
-  const centerUnit = svgEl('text', { x: 100, y: 115, 'text-anchor': 'middle', fill: '#4a6680', 'font-size': 11, 'font-family': 'JetBrains Mono' });
+  const centerUnit = svgEl('text', { x: 100, y: 115, 'text-anchor': 'middle', fill: '#6a8aaa', 'font-size': 11, 'font-family': 'JetBrains Mono' });
   centerUnit.textContent = 'GB';
   svg.appendChild(centerVal);
   svg.appendChild(centerUnit);
@@ -432,7 +447,7 @@ function _drawHistogram(canvas, history) {
   const axisLabel = axisMax < 10
     ? `${axisMax.toFixed(1)} ${unit}` : `${Math.round(axisMax)} ${unit}`;
   ctx.font      = `9px JetBrains Mono, monospace`;
-  ctx.fillStyle = 'rgba(74,102,128,0.75)';
+  ctx.fillStyle = 'rgba(106,138,170,0.85)';
   ctx.textAlign = 'right';
   ctx.fillText(axisLabel, W - 2, 10);
 }
@@ -548,6 +563,19 @@ async function checkForUpdate() {
 }
 
 // ── Actions ───────────────────────────────────────────────────────────
+
+async function upgradeOllamaApp() {
+  if (!confirm('Upgrade Ollama in TrueNAS?\nOllama will be unavailable for a few minutes during the update.')) return;
+  const msg = document.getElementById('ollama-upgrade-msg');
+  msg.textContent = 'Upgrade started — Ollama will restart automatically...';
+  try {
+    const res = await apiFetch('/api/upgrade-ollama', { method: 'POST' });
+    msg.textContent = res.ok ? 'Upgrading... check Ollama status in a few minutes.' : 'Error: ' + (res.error || '?');
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+  setTimeout(() => { msg.textContent = ''; }, 15000);
+}
 
 async function action(name) {
   const confirmMsg = {

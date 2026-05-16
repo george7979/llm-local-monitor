@@ -6,7 +6,7 @@
   --border:    #1e2d42;
   --border2:   #243650;
   --text:      #c5d4e0;
-  --dim:       #4a6680;
+  --dim:       #6a8aaa;
   --accent:    #2e88ff;
   --green:     #00c896;
   --amber:     #f59e0b;
@@ -60,7 +60,9 @@ header {
   color: var(--dim);
   background: var(--card); border: 1px solid var(--border);
   padding: 2px 9px; border-radius: 4px;
+  text-decoration: none;
 }
+.brand-host[href]:hover { color: var(--text); border-color: var(--border2); }
 
 .header-right { display: flex; align-items: center; gap: 14px; }
 
@@ -480,7 +482,9 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 2px 8px; border-radius: 4px; margin-left: auto; flex-shrink: 0;
 }
 .app-update-badge.ok     { background: rgba(0,200,150,.08); border: 1px solid rgba(0,200,150,.2); color: var(--green); }
-.app-update-badge.update { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber); }
+.app-update-badge.update { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber); animation: update-pulse 2.5s ease-in-out infinite; }
+.app-update-badge.clickable { cursor: pointer; }
+.app-update-badge.clickable:hover { background: rgba(245,158,11,.2); border-color: rgba(245,158,11,.5); }
 
 .app-stat-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 6px;

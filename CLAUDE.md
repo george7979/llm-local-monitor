@@ -82,6 +82,23 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama (host from env `LLM
 
 See `.env.example` — always use `config({ path: '.env', override: true })` (workspace CLAUDE.md requirement).
 
+## Release Procedure (dev → main)
+
+⚠️ **ZAWSZE przed merge do main:**
+
+1. Zmień `package.json`: `X.Y.Z-dev` → `X.Y.Z` (usuń suffix `-dev`)
+2. Commit: `release: bump to vX.Y.Z`
+3. Merge dev → main
+4. GitHub release `vX.Y.Z`
+
+**Wersjonowanie:**
+- `dev` branch: `package.json` zawsze ma suffix `-dev` (np. `1.2.0-dev`)
+- `main` branch: czysta wersja bez suffixu (np. `1.2.0`)
+- Suffix `-dev` wyłącza badge update check (`checkUpdate.js` pomija wersje z `-`)
+- Semver comparison — badge pojawia się tylko gdy `latest > current` (nie przy zwykłej różnicy)
+
+---
+
 ## Do NOT Modify
 
 - `src/lib/cache.js` — simple TTL implementation, do not over-engineer
