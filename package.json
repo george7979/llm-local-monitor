@@ -1,6 +1,6 @@
 {
   "name": "llm-local-monitor",
-  "version": "1.2.0",
+  "version": "1.2.0-dev",
   "type": "module",
   "main": "server.js",
   "scripts": {
