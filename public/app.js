@@ -38,10 +38,10 @@ async function pollAll() {
     renderGpu(data.gpu);
     renderMemory(data.memory);
     renderNetwork(data.network);
-    document.getElementById('last-updated').textContent =
+    document.getElementById('server-uptime').textContent =
       fmtUptime(data.uptime?.seconds);
   } catch (e) {
-    document.getElementById('last-updated').textContent = '—';
+    document.getElementById('server-uptime').textContent = '—';
   }
 }
 
