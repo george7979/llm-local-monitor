@@ -22,7 +22,7 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
         ↓ SSH (ed25519, decoded from SSH_PRIVATE_KEY_B64)
   $LLM_HOST ($LLM_USER)
   ↓ TCP probe :443
-  $IPMI_HOST (IPMI availability check — niezależny od SSH)
+  $IPMI_HOST (IPMI availability check — independent from SSH/OS state)
 ```
 
 ---
@@ -35,9 +35,9 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | Container stats | SSH → `/sys/fs/cgroup/docker/<id>/` | TrueNAS REST API does not expose cgroup stats; midclt over SSH gives status + cgroups in a single SSH call |
 | SSH key in container | Base64 in `SSH_PRIVATE_KEY_B64` | Dockge does not support easy file mounting; base64 in `.env` = full configuration via UI |
 | CPU% Ollama App | `usage_usec / (wall_usec × nproc) × 100` | `usage_usec` sums across all cores; without `nproc` values exceed 100% |
-| IPMI status | TCP probe port 443 na `$IPMI_HOST` | IPMI web interface odpowiada nawet gdy serwer jest wyłączony — niezależny sygnał dostępności od SSH/OS |
-| Uptime | SSH → `/proc/uptime` (awk) | Natychmiastowy odczyt z jądra, zero zależności od middleware; cache TTL = `pollIntervalSec - 1s` |
-| Update check | GitHub API `/releases/latest`, cache 1h server-side | Limit 60 req/h bez tokena — cache serwera chroni przed wyczerpaniem; klient odpytuje przy load + co 6h |
+| IPMI status | TCP probe port 443 on `$IPMI_HOST` | IPMI web interface responds even when server is powered off — availability signal independent from SSH/OS |
+| Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
+| Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
 
 ---
 
@@ -74,7 +74,7 @@ Copy `.env.example` → `.env` and fill in:
 | `IPMI_HOST` | BMC/IPMI module IP | ✅ |
 | `IPMI_USER` | IPMI user | ✅ |
 | `IPMI_PASS` | IPMI password | ✅ |
-| `TRUENAS_URL` | URL TrueNAS web UI (default: `https://$LLM_HOST`) — kliknięcie IP w nagłówku | optional |
+| `TRUENAS_URL` | TrueNAS web UI URL (default: `https://$LLM_HOST`) — clicking the IP in the header | optional |
 | `HOST_PORT` | Port on Dockge host (default: 3788) | optional |
 | `PORT` | Internal container port — must match Dockerfile EXPOSE (default: 3000) | optional |
 | `OLLAMA_BASE_URL` | Ollama API URL (default: `http://$LLM_HOST:11434`) | optional |
@@ -192,24 +192,24 @@ curl -X POST http://localhost:3788/api/wake
 
 ---
 
-## Update Check — jak działa
+## Update Check — how it works
 
-Aplikacja sprawdza GitHub API pod kątem nowych release'ów. Działają tu dwie warstwy cache:
+The app checks the GitHub API for new releases using two independent cache layers:
 
-**Warstwa 1 — serwer (1h):**
-`GET /api/check-update` odpytuje `github.com/repos/.../releases/latest` i zapamiętuje wynik na 1 godzinę. Każde zapytanie w tym czasie zwraca cached odpowiedź bez kontaktu z GitHub. Cache resetuje się przy restarcie kontenera.
+**Layer 1 — server (1h):**
+`GET /api/check-update` queries `github.com/repos/.../releases/latest` and caches the result for 1 hour. All requests within that window return the cached response without hitting GitHub. Cache resets on container restart.
 
-**Warstwa 2 — klient (6h):**
-Browser wywołuje `/api/check-update` w dwóch sytuacjach: przy każdym załadowaniu strony oraz co 6 godzin jeśli strona pozostaje otwarta.
+**Layer 2 — client (6h):**
+The browser calls `/api/check-update` in two situations: on every page load, and every 6 hours if the tab stays open.
 
 ```
-Strona załadowana → /api/check-update → serwer (GitHub lub cache 1h)
-Co 6h (jeśli karta otwarta) → /api/check-update → serwer (GitHub lub cache 1h)
+Page loaded  → /api/check-update → server (GitHub or 1h cache)
+Every 6h     → /api/check-update → server (GitHub or 1h cache)
 ```
 
-**Praktyczna konsekwencja:** po opublikowaniu nowego release'u badge `v1.x.x → v1.y.y` pojawi się najpóźniej po 1 godzinie (wygaśnięcie cache serwera) + przy kolejnym załadowaniu strony. Restart kontenera po release'u powoduje natychmiastowe odświeżenie cache.
+**Practical consequence:** after publishing a new release the update badge appears within 1 hour (server cache expiry) + next page load. Restarting the container after a release triggers an immediate cache refresh.
 
-**Porównanie wersji:** badge pojawia się tylko gdy `latest > current` (semver). Wersje z suffixem `-dev` pomijają sprawdzanie w ogóle.
+**Version comparison:** badge appears only when `latest > current` (semver). Same version on dev and main never triggers a false badge.
 
 ---
 
