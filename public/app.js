@@ -19,6 +19,16 @@ async function apiFetch(path, opts = {}) {
 
 // ── Polling ───────────────────────────────────────────────────────────
 
+function fmtUptime(sec) {
+  if (!sec || sec < 0) return '—';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `up ${d}d ${h}h`;
+  if (h > 0) return `up ${h}h ${m}m`;
+  return `up ${m}m`;
+}
+
 async function pollAll() {
   try {
     const data = await apiFetch('/api/status');
@@ -29,9 +39,9 @@ async function pollAll() {
     renderMemory(data.memory);
     renderNetwork(data.network);
     document.getElementById('last-updated').textContent =
-      new Date().toLocaleTimeString();
+      fmtUptime(data.uptime?.seconds);
   } catch (e) {
-    document.getElementById('last-updated').textContent = 'connection error';
+    document.getElementById('last-updated').textContent = '—';
   }
 }
 
