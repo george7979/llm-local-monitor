@@ -46,8 +46,8 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 | # | Task | Status |
 |---|------|--------|
 | 1 | LAN Ports widget (histogram, duplex) | ✅ Done |
-| 2 | App version badge + auto update check z GitHub | ✅ Done |
-| 3 | Responsywność mobilna (ukrycie IP na wąskich ekranach) | ✅ Done |
+| 2 | App version badge + auto update check from GitHub | ✅ Done |
+| 3 | Mobile responsiveness (hide IP on narrow screens) | ✅ Done |
 
 ---
 
@@ -57,13 +57,13 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | IPMI pill w nagłówku — Reachable/Unreachable (TCP probe, niezależny od SSH) | ✅ Done |
-| 2 | Server uptime w karcie SERVER | ✅ Done |
-| 3 | Upgrade Ollama przez kliknięcie badge'a w kafelku OLLAMA APP | ✅ Done |
-| 4 | Klikalny adres IP w nagłówku → TrueNAS web UI (TRUENAS_URL) | ✅ Done |
-| 5 | Semver comparison w update check (badge tylko gdy latest > current) | ✅ Done |
-| 6 | Rozjaśnienie drugorzędnych napisów (--dim) + poprawki kolorów canvas/SVG | ✅ Done |
-| 7 | Reorganizacja .env.example w logiczne sekcje | ✅ Done |
+| 1 | IPMI pill in header — Reachable/Unreachable (TCP probe, independent from SSH) | ✅ Done |
+| 2 | Server uptime in SERVER card | ✅ Done |
+| 3 | Upgrade Ollama by clicking the ⬆ Update badge in OLLAMA APP card | ✅ Done |
+| 4 | Clickable IP in header → TrueNAS web UI (TRUENAS_URL) | ✅ Done |
+| 5 | Semver comparison in update check (badge only when latest > current) | ✅ Done |
+| 6 | Brighter secondary text (--dim) + hardcoded color fixes in canvas/SVG | ✅ Done |
+| 7 | .env.example reorganized into logical sections | ✅ Done |
 
 ---
 

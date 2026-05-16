@@ -49,9 +49,9 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR1.4** Display RAM breakdown: free / ZFS ARC / services
 - **FR1.5** Display Ollama container stats: CPU%, RAM, Block I/O, Network, app status, version, update availability
 - **FR1.6** Auto-refresh every N seconds without user interaction (configurable via `POLL_INTERVAL_SEC`)
-- **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, niezależny od stanu OS
+- **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, independent from OS state
 - **FR1.8** Display server uptime in SERVER card
-- **FR1.9** Display LAN port throughput as live histograms (widget opcjonalny, wymaga konfiguracji)
+- **FR1.9** Display LAN port throughput as live histograms (optional widget, requires configuration)
 
 ### FR2: Server control
 
@@ -59,11 +59,11 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR2.2** **Shut down** button — gracefully shuts down the server
 - **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
 - **FR2.4** Buttons enabled/disabled based on host state
-- **FR2.5** **Upgrade Ollama** — klikalny badge `⬆ Update` w kafelku OLLAMA APP uruchamia upgrade przez TrueNAS midclt
+- **FR2.5** **Upgrade Ollama** — clicking the pulsing `⬆ Update` badge in OLLAMA APP card triggers upgrade via TrueNAS midclt
 
 ### FR3: Navigation
 
-- **FR3.1** Klikalny adres IP w nagłówku otwiera TrueNAS web UI (URL konfigurowalny przez `TRUENAS_URL`)
+- **FR3.1** Clickable host IP in header opens TrueNAS web UI (URL configurable via `TRUENAS_URL`)
 
 ### FR3: Accessibility
 
