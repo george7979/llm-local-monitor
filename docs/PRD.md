@@ -1,7 +1,7 @@
 # Product Requirements Document — llm-local-monitor
 
-**Version:** 1.1
-**Date:** 2026-05-10
+**Version:** 1.2
+**Date:** 2026-05-16
 **Author:** Jerzy Maczewski
 **Purpose:** Web dashboard for monitoring a GPU server running Ollama
 
@@ -48,7 +48,10 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR1.3** Display GPU stats: utilization, VRAM, temperature, power draw
 - **FR1.4** Display RAM breakdown: free / ZFS ARC / services
 - **FR1.5** Display Ollama container stats: CPU%, RAM, Block I/O, Network, app status, version, update availability
-- **FR1.6** Auto-refresh every 5 seconds without user interaction
+- **FR1.6** Auto-refresh every N seconds without user interaction (configurable via `POLL_INTERVAL_SEC`)
+- **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, niezależny od stanu OS
+- **FR1.8** Display server uptime in SERVER card
+- **FR1.9** Display LAN port throughput as live histograms (widget opcjonalny, wymaga konfiguracji)
 
 ### FR2: Server control
 
@@ -56,6 +59,11 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR2.2** **Shut down** button — gracefully shuts down the server
 - **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
 - **FR2.4** Buttons enabled/disabled based on host state
+- **FR2.5** **Upgrade Ollama** — klikalny badge `⬆ Update` w kafelku OLLAMA APP uruchamia upgrade przez TrueNAS midclt
+
+### FR3: Navigation
+
+- **FR3.1** Klikalny adres IP w nagłówku otwiera TrueNAS web UI (URL konfigurowalny przez `TRUENAS_URL`)
 
 ### FR3: Accessibility
 

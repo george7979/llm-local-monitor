@@ -1,7 +1,7 @@
 # Plan — llm-local-monitor
 
-**Version:** 1.1
-**Date:** 2026-05-10
+**Version:** 1.2
+**Date:** 2026-05-16
 
 ---
 
@@ -34,6 +34,36 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 2. **Container stats** — cgroup + midclt over SSH instead of TrueNAS REST API
 3. **SSH key in container** — base64 in `.env` instead of volume mount
 4. **CPU%** — normalized by nproc
+
+---
+
+---
+
+## Milestone: v1.1.x — UI polish & fixes
+
+**Status:** ✅ Done (released 2026-05-12)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | LAN Ports widget (histogram, duplex) | ✅ Done |
+| 2 | App version badge + auto update check z GitHub | ✅ Done |
+| 3 | Responsywność mobilna (ukrycie IP na wąskich ekranach) | ✅ Done |
+
+---
+
+## Milestone: v1.2.0 — IPMI monitoring, uptime, Ollama upgrade
+
+**Status:** ✅ Done (released 2026-05-16)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | IPMI pill w nagłówku — Reachable/Unreachable (TCP probe, niezależny od SSH) | ✅ Done |
+| 2 | Server uptime w karcie SERVER | ✅ Done |
+| 3 | Upgrade Ollama przez kliknięcie badge'a w kafelku OLLAMA APP | ✅ Done |
+| 4 | Klikalny adres IP w nagłówku → TrueNAS web UI (TRUENAS_URL) | ✅ Done |
+| 5 | Semver comparison w update check (badge tylko gdy latest > current) | ✅ Done |
+| 6 | Rozjaśnienie drugorzędnych napisów (--dim) + poprawki kolorów canvas/SVG | ✅ Done |
+| 7 | Reorganizacja .env.example w logiczne sekcje | ✅ Done |
 
 ---
 
