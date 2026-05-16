@@ -11,6 +11,7 @@ import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
 import { sleepServer } from './actions/sleep.js';
 import { restartOllama } from './actions/restartOllama.js';
+import { upgradeOllama } from './actions/upgradeOllama.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 
 export const router = Router();
@@ -84,6 +85,14 @@ router.post('/sleep', async (_req, res) => {
 router.post('/restart-ollama', async (_req, res) => {
   try {
     res.json(await restartOllama());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/upgrade-ollama', async (_req, res) => {
+  try {
+    res.json(await upgradeOllama());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

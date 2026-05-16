@@ -234,8 +234,12 @@ function renderOllamaApp(data) {
   const stateText = (data.state || '').toUpperCase();
   const stateBadge = el('span', `app-state-badge ${stateText === 'RUNNING' ? 'running' : 'stopped'}`, stateText || '—');
   const version = el('span', 'app-version', `v${data.version || '?'}`);
-  const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update' : 'ok'}`,
+  const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update clickable' : 'ok'}`,
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
+  if (data.upgradeAvailable) {
+    updateBadge.title = 'Click to upgrade Ollama in TrueNAS';
+    updateBadge.onclick = () => upgradeOllamaApp();
+  }
   statusRow.appendChild(stateBadge);
   statusRow.appendChild(version);
   statusRow.appendChild(updateBadge);
@@ -558,6 +562,19 @@ async function checkForUpdate() {
 }
 
 // ── Actions ───────────────────────────────────────────────────────────
+
+async function upgradeOllamaApp() {
+  if (!confirm('Upgrade Ollama in TrueNAS?\nOllama will be unavailable for a few minutes during the update.')) return;
+  const msg = document.getElementById('action-msg');
+  msg.textContent = 'Upgrade started — Ollama will restart automatically...';
+  try {
+    const res = await apiFetch('/api/upgrade-ollama', { method: 'POST' });
+    msg.textContent = res.ok ? 'Upgrading... check Ollama status in a few minutes.' : 'Error: ' + (res.error || '?');
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+  setTimeout(() => { msg.textContent = ''; }, 15000);
+}
 
 async function action(name) {
   const confirmMsg = {
