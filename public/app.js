@@ -51,7 +51,7 @@ fetch('/api/config').then(r => r.json()).then(c => {
   const el = document.getElementById('brand-host');
   if (el) {
     el.textContent = h;
-    if (c.llmHost) el.href = `https://${c.llmHost}${c.truenasPort ? ':' + c.truenasPort : ''}`;
+    if (c.llmHost) el.href = c.truenasUrl || `https://${c.llmHost}`;
   }
   document.title = `LLM Monitor — ${h}`;
   const vEl = document.getElementById('app-version');

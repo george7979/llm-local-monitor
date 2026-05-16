@@ -17,7 +17,7 @@ import { checkUpdate } from './actions/checkUpdate.js';
 export const router = Router();
 
 router.get('/config', (_req, res) => {
-  res.json({ llmHost: cfg.llmHost, truenasPort: cfg.truenasPort, pollIntervalSec: cfg.pollIntervalSec, version: cfg.version });
+  res.json({ llmHost: cfg.llmHost, truenasUrl: cfg.truenasUrl, pollIntervalSec: cfg.pollIntervalSec, version: cfg.version });
 });
 
 function safeCollect(fn) {

@@ -18,7 +18,7 @@ export const cfg = {
   ipmiUser: process.env.IPMI_USER || 'ADMIN',
   ipmiPass: process.env.IPMI_PASS,
   ipmiInterface: process.env.IPMI_INTERFACE || 'lanplus',
-  truenasPort: process.env.TRUENAS_PORT ? parseInt(process.env.TRUENAS_PORT, 10) : null,
+  truenasUrl: process.env.TRUENAS_URL || null,
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || `http://${process.env.LLM_HOST}:11434`,
   ollamaAppName: process.env.OLLAMA_APP_NAME || 'ollama',
   networkPhysIfaces: process.env.NETWORK_PHYS_IFACES
