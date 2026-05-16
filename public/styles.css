@@ -60,7 +60,9 @@ header {
   color: var(--dim);
   background: var(--card); border: 1px solid var(--border);
   padding: 2px 9px; border-radius: 4px;
+  text-decoration: none;
 }
+.brand-host[href]:hover { color: var(--text); border-color: var(--border2); }
 
 .header-right { display: flex; align-items: center; gap: 14px; }
 

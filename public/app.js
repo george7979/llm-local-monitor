@@ -49,7 +49,10 @@ async function pollAll() {
 fetch('/api/config').then(r => r.json()).then(c => {
   const h = c.llmHost || '—';
   const el = document.getElementById('brand-host');
-  if (el) el.textContent = h;
+  if (el) {
+    el.textContent = h;
+    if (c.llmHost) el.href = `https://${c.llmHost}`;
+  }
   document.title = `LLM Monitor — ${h}`;
   const vEl = document.getElementById('app-version');
   if (vEl && c.version) vEl.textContent = `v${c.version}`;
