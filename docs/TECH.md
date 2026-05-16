@@ -12,12 +12,17 @@
 Browser (local network)
   ↓ HTTP :3788 (HOST_PORT)
 Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
-  ├── GET /api/status   → collectors in parallel (cached 2s)
-  ├── POST /api/wake    → ipmitool → $IPMI_HOST
-  ├── POST /api/sleep   → ipmitool power soft → $IPMI_HOST
-  └── POST /api/restart-ollama → SSH → midclt call app.restart
+  ├── GET /api/config          → version, llmHost, truenasUrl, pollIntervalSec
+  ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive
+  ├── GET /api/check-update    → GitHub API (cached 1h server-side)
+  ├── POST /api/wake           → ipmitool → $IPMI_HOST
+  ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
+  ├── POST /api/restart-ollama → SSH → midclt call app.stop/start
+  └── POST /api/upgrade-ollama → SSH → midclt call app.upgrade
         ↓ SSH (ed25519, decoded from SSH_PRIVATE_KEY_B64)
   $LLM_HOST ($LLM_USER)
+  ↓ TCP probe :443
+  $IPMI_HOST (IPMI availability check — niezależny od SSH)
 ```
 
 ---
@@ -30,6 +35,9 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | Container stats | SSH → `/sys/fs/cgroup/docker/<id>/` | TrueNAS REST API does not expose cgroup stats; midclt over SSH gives status + cgroups in a single SSH call |
 | SSH key in container | Base64 in `SSH_PRIVATE_KEY_B64` | Dockge does not support easy file mounting; base64 in `.env` = full configuration via UI |
 | CPU% Ollama App | `usage_usec / (wall_usec × nproc) × 100` | `usage_usec` sums across all cores; without `nproc` values exceed 100% |
+| IPMI status | TCP probe port 443 na `$IPMI_HOST` | IPMI web interface odpowiada nawet gdy serwer jest wyłączony — niezależny sygnał dostępności od SSH/OS |
+| Uptime | SSH → `/proc/uptime` (awk) | Natychmiastowy odczyt z jądra, zero zależności od middleware; cache TTL = `pollIntervalSec - 1s` |
+| Update check | GitHub API `/releases/latest`, cache 1h server-side | Limit 60 req/h bez tokena — cache serwera chroni przed wyczerpaniem; klient odpytuje przy load + co 6h |
 
 ---
 
@@ -66,12 +74,18 @@ Copy `.env.example` → `.env` and fill in:
 | `IPMI_HOST` | BMC/IPMI module IP | ✅ |
 | `IPMI_USER` | IPMI user | ✅ |
 | `IPMI_PASS` | IPMI password | ✅ |
+| `TRUENAS_URL` | URL TrueNAS web UI (default: `https://$LLM_HOST`) — kliknięcie IP w nagłówku | optional |
 | `HOST_PORT` | Port on Dockge host (default: 3788) | optional |
+| `PORT` | Internal container port — must match Dockerfile EXPOSE (default: 3000) | optional |
 | `OLLAMA_BASE_URL` | Ollama API URL (default: `http://$LLM_HOST:11434`) | optional |
 | `OLLAMA_APP_NAME` | TrueNAS App name for Ollama (default: `ollama`) | optional |
+| `POLL_INTERVAL_SEC` | Polling interval in seconds (default: 5) | optional |
 | `IPMI_INTERFACE` | ipmitool interface (default: `lanplus`, use `lan` for IPMI v1.5) | optional |
 | `WAKE_CMD` | Custom wake command — overrides ipmitool default | optional |
 | `SLEEP_CMD` | Custom shutdown command — overrides ipmitool default | optional |
+| `NETWORK_PHYS_IFACES` | Comma-separated physical NIC names — enables LAN Ports widget | optional |
+| `NETWORK_HOST_IFACE` | Host/bond interface shown as summary row (e.g. `br0`) | optional |
+| `NETWORK_LINK_SPEED_MBIT` | Override auto-detected link speed in Mbit/s | optional |
 | `SSH_KEY_PATH` | Key path inside container (default: `/root/.ssh/id_ed25519`) | optional |
 
 Generate `SSH_PRIVATE_KEY_B64`:
@@ -175,6 +189,27 @@ curl http://localhost:3788/api/ollama-app
 # Action test (be careful!)
 curl -X POST http://localhost:3788/api/wake
 ```
+
+---
+
+## Update Check — jak działa
+
+Aplikacja sprawdza GitHub API pod kątem nowych release'ów. Działają tu dwie warstwy cache:
+
+**Warstwa 1 — serwer (1h):**
+`GET /api/check-update` odpytuje `github.com/repos/.../releases/latest` i zapamiętuje wynik na 1 godzinę. Każde zapytanie w tym czasie zwraca cached odpowiedź bez kontaktu z GitHub. Cache resetuje się przy restarcie kontenera.
+
+**Warstwa 2 — klient (6h):**
+Browser wywołuje `/api/check-update` w dwóch sytuacjach: przy każdym załadowaniu strony oraz co 6 godzin jeśli strona pozostaje otwarta.
+
+```
+Strona załadowana → /api/check-update → serwer (GitHub lub cache 1h)
+Co 6h (jeśli karta otwarta) → /api/check-update → serwer (GitHub lub cache 1h)
+```
+
+**Praktyczna konsekwencja:** po opublikowaniu nowego release'u badge `v1.x.x → v1.y.y` pojawi się najpóźniej po 1 godzinie (wygaśnięcie cache serwera) + przy kolejnym załadowaniu strony. Restart kontenera po release'u powoduje natychmiastowe odświeżenie cache.
+
+**Porównanie wersji:** badge pojawia się tylko gdy `latest > current` (semver). Wersje z suffixem `-dev` pomijają sprawdzanie w ogóle.
 
 ---
 
