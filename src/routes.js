@@ -23,8 +23,10 @@ function safeCollect(fn) {
 }
 
 router.get('/status', async (_req, res) => {
-  const host = await safeCollect(getHostStatus);
-  const ipmi = await safeCollect(getIpmiStatus);
+  const [host, ipmi] = await Promise.all([
+    safeCollect(getHostStatus),
+    safeCollect(getIpmiStatus),
+  ]);
   let ollama = null, gpu = null, memory = null, network = null;
 
   if (host.alive) {
