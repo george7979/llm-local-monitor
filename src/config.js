@@ -1,8 +1,11 @@
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';
-const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
+const { version: baseVersion } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
 
 config({ path: '.env', override: true });
+
+const branch = (process.env.APP_BRANCH || '').trim();
+const version = branch && branch !== 'main' ? `${baseVersion}-${branch}` : baseVersion;
 
 const required = ['LLM_HOST', 'LLM_USER'];
 for (const key of required) {
