@@ -19,10 +19,6 @@ let _cacheTs = 0;
 export async function checkUpdate() {
   if (_cache && Date.now() - _cacheTs < TTL_MS) return _cache;
 
-  if (cfg.version.includes('-')) {
-    return { current: cfg.version, latest: null, updateAvailable: false, releaseUrl: null };
-  }
-
   try {
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/releases/latest`,
