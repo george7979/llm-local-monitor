@@ -593,3 +593,6 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* .gpu-card-name: #7a9ab8 too light on white */
 [data-theme="light"] .gpu-card-name { color: #424a53; }
+
+/* SVG donut center value: hardcoded fill="#dde8f0" */
+[data-theme="light"] .mem-center-val { fill: var(--text); }
