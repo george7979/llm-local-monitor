@@ -1,7 +1,7 @@
 # Plan — llm-local-monitor
 
-**Version:** 1.2
-**Date:** 2026-05-16
+**Version:** 1.2.1
+**Date:** 2026-05-25
 
 ---
 
@@ -64,6 +64,20 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 | 5 | Semver comparison in update check (badge only when latest > current) | ✅ Done |
 | 6 | Brighter secondary text (--dim) + hardcoded color fixes in canvas/SVG | ✅ Done |
 | 7 | .env.example reorganized into logical sections | ✅ Done |
+
+---
+
+## Milestone: v1.2.1 — Light theme & theme toggle
+
+**Status:** ✅ Done (released 2026-05-25)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Light theme — Blue-Gray palette (GitHub-like) via CSS custom properties | ✅ Done |
+| 2 | Theme toggle button — round ☀/☽ icon in header | ✅ Done |
+| 3 | Auto-detect from OS `prefers-color-scheme` on first visit | ✅ Done |
+| 4 | Preference persisted to `localStorage`; live sync when OS changes | ✅ Done |
+| 5 | Structural overrides for hardcoded dark colors (SVG, header, bar tracks, table dividers) | ✅ Done |
 
 ---
 
