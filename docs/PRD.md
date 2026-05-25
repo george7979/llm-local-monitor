@@ -1,7 +1,7 @@
 # Product Requirements Document — llm-local-monitor
 
-**Version:** 1.2
-**Date:** 2026-05-16
+**Version:** 1.2.1
+**Date:** 2026-05-25
 **Author:** Jerzy Maczewski
 **Purpose:** Web dashboard for monitoring a GPU server running Ollama
 
@@ -69,6 +69,12 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 
 - **FR3.1** No authentication — internal tool, accessed from local network
 - **FR3.2** No public exposure — local network only
+
+### FR4: Appearance
+
+- **FR4.1** Dashboard supports light and dark themes
+- **FR4.2** Theme auto-detected from OS `prefers-color-scheme` on first visit; no configuration required
+- **FR4.3** User can manually toggle theme via a button in the header; preference persisted across sessions
 
 ---
 

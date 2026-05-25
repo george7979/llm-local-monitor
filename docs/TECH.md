@@ -41,6 +41,24 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 
 ---
 
+## Theme System
+
+All colors are defined as CSS custom properties in `:root` (dark by default). A `[data-theme="light"]` block in `styles.css` overrides every variable to the Blue-Gray palette.
+
+**Entry point:** `public/theme.js` — a small IIFE loaded synchronously in `<head>` (no `defer`/`async`) to prevent FOUC. It:
+
+1. Reads `localStorage.getItem('llm-monitor-theme')` — uses it if present
+2. Falls back to `window.matchMedia('(prefers-color-scheme: light)')` on first visit
+3. Sets `document.documentElement.setAttribute('data-theme', theme)` before first paint
+4. Exposes `window.toggleTheme()` for the button's `onclick`
+5. Listens for OS color-scheme changes; only applies them when no manual preference is saved
+
+**localStorage key:** `llm-monitor-theme` (`"dark"` | `"light"`)
+
+**Hardcoded color overrides:** Several selectors in `styles.css` use hardcoded hex values instead of CSS variables (SVG `fill` attributes, header background, `#dde8f0` text). These are explicitly overridden in the `[data-theme="light"]` block at the bottom of `styles.css`.
+
+---
+
 ## Dev Commands
 
 ```bash
