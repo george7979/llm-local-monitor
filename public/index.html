@@ -6,6 +6,7 @@
   <title>LLM Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,6 +20,7 @@
   <div class="header-right">
     <a id="app-version" class="app-version-badge" href="https://github.com/george7979/llm-local-monitor" target="_blank" rel="noopener"></a>
     <a id="update-badge" class="update-available-badge" style="display:none" target="_blank" rel="noopener"></a>
+    <button id="btn-theme" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">&#9728;</button>
     <div class="host-pill" id="host-pill">
       <span class="pill-dot" id="pill-dot"></span>
       <span id="pill-label">connecting...</span>
