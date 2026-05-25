@@ -529,3 +529,70 @@ tbody tr:last-child td { border-bottom: none; }
   .gpu-grid  { grid-template-columns: 1fr; }
   .mem-stats { grid-template-columns: 1fr; }
 }
+
+/* ── THEME TOGGLE ──────────────────────────── */
+
+.theme-toggle {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
+  flex-shrink: 0;
+}
+.theme-toggle:hover:not(:disabled) {
+  background: var(--border);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ── LIGHT THEME ───────────────────────────── */
+
+[data-theme="light"] {
+  --bg:      #f6f8fa;
+  --bg2:     #eef1f4;
+  --card:    #ffffff;
+  --card2:   #f6f8fa;
+  --border:  #d0d7de;
+  --border2: #bdc5cd;
+  --text:    #1f2328;
+  --dim:     #57606a;
+  --accent:  #0969da;
+  --green:   #1a7f37;
+  --amber:   #9a6700;
+  --red:     #cf222e;
+  --purple:  #6e40c9;
+}
+
+/* header: hardcoded rgba dark background */
+[data-theme="light"] header {
+  background: rgba(246,248,250,.97);
+}
+
+/* body: dark tinted gradients → light tints */
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 10% -10%, rgba(9,105,218,.04) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 90% 110%, rgba(110,64,201,.03) 0%, transparent 60%);
+}
+
+/* hardcoded #dde8f0 (near-white) — invisible on white card */
+[data-theme="light"] .brand-name    { color: var(--text); }
+[data-theme="light"] .status-text   { color: var(--text); }
+[data-theme="light"] .app-stat-val  { color: var(--text); }
+[data-theme="light"] .mem-legend-gb { color: var(--text); }
+
+/* bar track: rgba(255,255,255,.05) invisible on white */
+[data-theme="light"] .bar-track { background: rgba(0,0,0,.08); }
+
+/* table row divider: dark blue rgba */
+[data-theme="light"] tbody td { border-bottom: 1px solid var(--border); }
+
+/* .td-model: #7aabcc too light on white */
+[data-theme="light"] .td-model { color: #0550ae; }
+
+/* .gpu-card-name: #7a9ab8 too light on white */
+[data-theme="light"] .gpu-card-name { color: #424a53; }
+
+/* SVG donut center value: hardcoded fill="#dde8f0" */
+[data-theme="light"] .mem-center-val { fill: var(--text); }

@@ -347,7 +347,7 @@ function renderMemory(data) {
 
   // Center labels
   const totalGb = gb(total);
-  const centerVal = svgEl('text', { x: 100, y: 97, 'text-anchor': 'middle', fill: '#dde8f0', 'font-size': 20, 'font-family': 'JetBrains Mono', 'font-weight': 600 });
+  const centerVal = svgEl('text', { x: 100, y: 97, 'text-anchor': 'middle', fill: '#dde8f0', 'font-size': 20, 'font-family': 'JetBrains Mono', 'font-weight': 600, class: 'mem-center-val' });
   centerVal.textContent = totalGb;
   const centerUnit = svgEl('text', { x: 100, y: 115, 'text-anchor': 'middle', fill: '#6a8aaa', 'font-size': 11, 'font-family': 'JetBrains Mono' });
   centerUnit.textContent = 'GB';
