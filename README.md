@@ -15,6 +15,15 @@ The monitor runs as a Docker container on the Dockge host and queries the GPU se
 
 ![Screenshot](pics/dashboard-eng-5.png)
 
+## Theme
+
+The dashboard ships with a **dark theme** (default) and a **light theme** (Blue-Gray palette).
+
+- **Auto-detect** — on first visit the theme follows your OS `prefers-color-scheme` setting
+- **Manual toggle** — click the ☀ / ☽ icon button in the header to switch
+- **Persistent** — your choice is saved to `localStorage` and restored on next visit
+- **Live sync** — if no manual preference is set, the theme updates automatically when you change your OS appearance
+
 ## Panels
 
 | Panel | Shows | Data source |
