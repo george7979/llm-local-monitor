@@ -597,26 +597,14 @@ tbody tr:last-child td { border-bottom: none; }
 /* SVG donut center value: hardcoded fill="#dde8f0" */
 [data-theme="light"] .mem-center-val { fill: var(--text); }
 
-/* badge.warn / badge.hot: colored text invisible on white — flip to bg highlight + dot */
+/* badge.warn / badge.hot: amber/red text too light on white — use darker shade (WCAG AA) */
 [data-theme="light"] .badge.warn {
-  color: var(--dim);
-  background: rgba(245,158,11,.15);
-  border-color: rgba(245,158,11,.5);
+  color: #b45309;
+  background: rgba(245,158,11,.1);
+  border-color: rgba(245,158,11,.45);
 }
 [data-theme="light"] .badge.hot {
-  color: var(--dim);
-  background: rgba(240,68,56,.12);
-  border-color: rgba(240,68,56,.45);
-}
-[data-theme="light"] .badge.warn::before {
-  content: "●";
-  color: #d97706;
-  margin-right: 3px;
-  font-size: 7px;
-}
-[data-theme="light"] .badge.hot::before {
-  content: "●";
   color: #dc2626;
-  margin-right: 3px;
-  font-size: 7px;
+  background: rgba(240,68,56,.08);
+  border-color: rgba(240,68,56,.4);
 }
