@@ -1,7 +1,7 @@
 # Plan — llm-local-monitor
 
-**Version:** 1.2.1
-**Date:** 2026-05-25
+**Version:** 1.2.2
+**Date:** 2026-06-18
 
 ---
 
@@ -78,6 +78,18 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 | 3 | Auto-detect from OS `prefers-color-scheme` on first visit | ✅ Done |
 | 4 | Preference persisted to `localStorage`; live sync when OS changes | ✅ Done |
 | 5 | Structural overrides for hardcoded dark colors (SVG, header, bar tracks, table dividers) | ✅ Done |
+
+---
+
+## Milestone: v1.2.2 — Update Ollama button in SERVER card
+
+**Status:** ✅ Done (released 2026-06-18)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | "Update Ollama" button in SERVER card, under "Restart Ollama" | ✅ Done |
+| 2 | Button enabled only when host online + `ollamaApp.upgradeAvailable`; greyed out otherwise (Wake-button pattern) | ✅ Done |
+| 3 | Reuses `/api/upgrade-ollama`; `upgradeOllamaApp(msgId)` routes feedback to the SERVER card while the badge keeps its own | ✅ Done |
 
 ---
 

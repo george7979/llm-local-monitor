@@ -32,7 +32,7 @@ function fmtUptime(sec) {
 async function pollAll() {
   try {
     const data = await apiFetch('/api/status');
-    renderStatus(data.host, data.ipmi);
+    renderStatus(data.host, data.ipmi, data.ollamaApp);
     renderOllama(data.ollama);
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
@@ -68,7 +68,7 @@ fetch('/api/config').then(r => r.json()).then(c => {
 
 // ── Status ────────────────────────────────────────────────────────────
 
-function renderStatus(host, ipmi) {
+function renderStatus(host, ipmi, ollamaApp) {
   if (!host) return;
   const ring  = document.getElementById('status-ring');
   const dot   = document.getElementById('pill-dot');
@@ -78,6 +78,7 @@ function renderStatus(host, ipmi) {
   const wake  = document.getElementById('btn-wake');
   const sleep = document.getElementById('btn-sleep');
   const rst   = document.getElementById('btn-restart');
+  const upg   = document.getElementById('btn-upgrade');
 
   // Header pill = IPMI availability
   if (ipmi?.alive) {
@@ -93,10 +94,12 @@ function renderStatus(host, ipmi) {
     ring.className  = 'status-ring alive';
     text.textContent  = 'Online';
     wake.disabled = true; sleep.disabled = false; rst.disabled = false;
+    upg.disabled = !ollamaApp?.upgradeAvailable;
   } else {
     ring.className  = 'status-ring dead';
     text.textContent  = 'Powered off';
     wake.disabled = false; sleep.disabled = true; rst.disabled = true;
+    upg.disabled = true;
   }
 
   sub.textContent = host.checkedAt
@@ -564,9 +567,9 @@ async function checkForUpdate() {
 
 // ── Actions ───────────────────────────────────────────────────────────
 
-async function upgradeOllamaApp() {
+async function upgradeOllamaApp(msgId = 'ollama-upgrade-msg') {
   if (!confirm('Upgrade Ollama in TrueNAS?\nOllama will be unavailable for a few minutes during the update.')) return;
-  const msg = document.getElementById('ollama-upgrade-msg');
+  const msg = document.getElementById(msgId);
   msg.textContent = 'Upgrade started — Ollama will restart automatically...';
   try {
     const res = await apiFetch('/api/upgrade-ollama', { method: 'POST' });
