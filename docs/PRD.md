@@ -1,7 +1,7 @@
 # Product Requirements Document — llm-local-monitor
 
-**Version:** 1.2.1
-**Date:** 2026-05-25
+**Version:** 1.2.2
+**Date:** 2026-06-18
 **Author:** Jerzy Maczewski
 **Purpose:** Web dashboard for monitoring a GPU server running Ollama
 
@@ -59,7 +59,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR2.2** **Shut down** button — gracefully shuts down the server
 - **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
 - **FR2.4** Buttons enabled/disabled based on host state
-- **FR2.5** **Upgrade Ollama** — clicking the pulsing `⬆ Update` badge in OLLAMA APP card triggers upgrade via TrueNAS midclt
+- **FR2.5** **Upgrade Ollama** — triggers upgrade via TrueNAS midclt; available both as the pulsing `⬆ Update` badge in OLLAMA APP card and as an **Update Ollama** button in the SERVER card. The button is greyed out when no upgrade is available (same pattern as the Wake button)
 
 ### FR3: Navigation
 

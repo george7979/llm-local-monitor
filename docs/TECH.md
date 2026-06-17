@@ -38,6 +38,7 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | IPMI status | TCP probe port 443 on `$IPMI_HOST` | IPMI web interface responds even when server is powered off — availability signal independent from SSH/OS |
 | Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
+| Upgrade Ollama UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeOllamaApp(msgId)` routes feedback to the calling card |
 
 ---
 
