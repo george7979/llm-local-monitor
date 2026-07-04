@@ -546,6 +546,35 @@ tbody tr:last-child td { border-bottom: none; }
   color: var(--text);
 }
 
+/* ── GPU PROCESS MODAL ─────────────────────── */
+
+.gpu-card { cursor: pointer; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 20px 22px;
+  min-width: 420px; max-width: 90vw;
+  max-height: 80vh; overflow: auto;
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; margin-bottom: 14px;
+}
+.modal-title { font-size: 13px; font-weight: 600; letter-spacing: .05em; }
+.modal-sub   { font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 2px; }
+.modal-close {
+  background: none; border: none; color: var(--dim);
+  font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;
+}
+.modal-close:hover { color: var(--text); }
+
 /* ── LIGHT THEME ───────────────────────────── */
 
 [data-theme="light"] {
