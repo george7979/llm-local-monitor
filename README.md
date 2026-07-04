@@ -24,6 +24,23 @@ The dashboard ships with a **dark theme** (default) and a **light theme** (Blue-
 - **Persistent** — your choice is saved to `localStorage` and restored on next visit
 - **Live sync** — if no manual preference is set, the theme updates automatically when you change your OS appearance
 
+## GPU process details — click a card
+
+Ever wondered *what exactly* is sitting on a GPU? Click any GPU card to find out.
+
+A modal opens with every compute process running on that card — and instead of the cryptic
+binary paths `nvidia-smi` gives you (`/app/.venv/bin/python`...), you see the **actual app name**
+from TrueNAS: `ollama`, `whisper-asr-whisperx`, `open-webui`, etc.
+
+- **Container** — TrueNAS app / container name (the label you actually recognize)
+- **Binary** — executable name, full path in the tooltip
+- **PID / VRAM** — process id and its VRAM usage in MB
+- **Live** — the list refreshes with the dashboard polling while open
+- Close with ✕, a click outside, or `Esc`; cards also work with the keyboard (`Tab` + `Enter`)
+
+The `OLLAMA` badge on the cards still shows at a glance where Ollama lives — the modal is for
+the full picture.
+
 ## Panels
 
 | Panel | Shows | Data source |
@@ -33,7 +50,7 @@ The dashboard ships with a **dark theme** (default) and a **light theme** (Blue-
 | **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
 | **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
 | **Loaded models** | Model, size, quant, GPU/CPU split, context | Ollama REST API `:11434/api/ps` |
-| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge on cards with active process | SSH → `nvidia-smi` |
+| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge; click a card → per-process modal with app names | SSH → `nvidia-smi` + `/proc/<pid>/cgroup` + `midclt` |
 
 ---
 
