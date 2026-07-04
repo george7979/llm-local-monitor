@@ -418,8 +418,15 @@ In `pollAll()` (line 32), after `renderGpu(data.gpu);` add:
 In the `data.gpus.forEach((g) => {` loop, right after `const card = el('div', 'gpu-card');` (line 176), add:
 
 ```js
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
     card.addEventListener('click', () => openGpuModal(g.busId));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGpuModal(g.busId); }
+    });
 ```
+
+(Keyboard access added per Task 4 code review — cards are divs, so they need `role`/`tabindex`/keydown to be operable without a mouse.)
 
 - [ ] **Step 4: Add modal functions (new section after `makeGpuBar`, ~line 220)**
 
@@ -430,6 +437,7 @@ function openGpuModal(busId) {
   gpuModalBusId = busId;
   renderGpuModal();
   document.getElementById('gpu-modal').style.display = 'flex';
+  document.getElementById('gpu-modal-close').focus();
 }
 
 function closeGpuModal() {
