@@ -14,7 +14,7 @@ Browser (local network)
 Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── GET /api/config          → version, llmHost, truenasUrl, pollIntervalSec
   ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive
-  ├── GET /api/gpu-procs        → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
+  ├── GET /api/gpu-procs       → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
   ├── GET /api/check-update    → GitHub API (cached 1h server-side)
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
