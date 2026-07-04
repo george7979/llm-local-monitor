@@ -6,6 +6,7 @@ import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getOllamaAppStats } from './collectors/ollamaApp.js';
 import { getGpuStatus } from './collectors/gpu.js';
+import { getGpuProcs } from './collectors/gpuProcs.js';
 import { getMemoryStatus } from './collectors/memory.js';
 import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
@@ -56,6 +57,10 @@ router.get('/ollama-app', async (_req, res) => {
 
 router.get('/gpu', async (_req, res) => {
   res.json(await safeCollect(getGpuStatus));
+});
+
+router.get('/gpu-procs', async (_req, res) => {
+  res.json(await safeCollect(getGpuProcs));
 });
 
 router.get('/memory', async (_req, res) => {
