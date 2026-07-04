@@ -23,7 +23,7 @@ No repo changes — proves the enrichment works on the live host before writing 
 **Files:**
 - Create (scratchpad only): `$SCRATCH/gpuprocs.sh` (session scratchpad, NOT in repo)
 
-- [ ] **Step 1: Write the pipeline script to the scratchpad**
+- [x] **Step 1: Write the pipeline script to the scratchpad**
 
 Content of `$SCRATCH/gpuprocs.sh` (POSIX sh, runs on the TrueNAS host as root):
 
@@ -48,7 +48,7 @@ done
 
 Parsing notes: nvidia-smi CSV separator is `", "`. Parameter expansion is used instead of `IFS=,` so a `process_name` containing spaces stays intact (`mem` strips the longest prefix `##*, `, `name` strips the shortest suffix `%, *`).
 
-- [ ] **Step 2: Run it on the host via SSH using the project's key**
+- [x] **Step 2: Run it on the host via SSH using the project's key**
 
 ```bash
 cd /home/jerzy/cursor/llm-local-monitor
@@ -68,13 +68,21 @@ Column 3 must be a real container name (not `-`). If every row shows `-`, inspec
 
 Also verify the empty case: if no models are loaded, output is empty and exit code is 0.
 
-- [ ] **Step 3: Clean up the key file**
+- [x] **Step 3: Clean up the key file**
 
 ```bash
 rm -f "$SCRATCH/llm-key"
 ```
 
 No commit (nothing in repo changed).
+
+> **Execution note (2026-07-04):** verified on the live host with two deviations that are
+> folded into Task 2 below: (1) local `.env` uses `SSH_KEY_PATH`, not `SSH_PRIVATE_KEY_B64`
+> (the latter exists only inside the container); (2) `docker ps` is not accessible to
+> `truenas_admin` (no docker.sock access, no passwordless sudo) — the ID→name map is built
+> from `midclt call app.query` instead, yielding TrueNAS app names (`ollama`,
+> `whisper-asr-whisperx`), which are nicer labels anyway. Cgroup format confirmed:
+> `0::/docker/<64-hex>`. Observed live output: 3 processes, all with resolved names.
 
 ---
 
@@ -93,11 +101,24 @@ import { sshExec } from '../lib/ssh.js';
 import { cached } from '../lib/cache.js';
 
 // nvidia-smi PIDs are host-namespace PIDs; /proc/<pid>/cgroup read on the host
-// contains the Docker container id, resolved to a name via `docker ps`.
+// contains the Docker container id, resolved to a TrueNAS app name via
+// `midclt call app.query` (docker.sock is not accessible to truenas_admin).
 const SCRIPT = `
 apps=$(nvidia-smi --query-compute-apps=gpu_bus_id,pid,process_name,used_gpu_memory --format=csv,noheader,nounits 2>/dev/null) || exit 0
 [ -z "$apps" ] && exit 0
-map=$(docker ps --no-trunc --format "{{.ID}} {{.Names}}" 2>/dev/null)
+map=$(midclt call app.query 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for a in data:
+    for c in (a.get("active_workloads") or {}).get("container_details") or []:
+        cid = c.get("id")
+        name = a.get("name")
+        if cid and name:
+            print(cid, name)
+' 2>/dev/null)
 echo "$apps" | while IFS= read -r line; do
   bus=\${line%%,*}
   rest=\${line#*, }
@@ -162,11 +183,11 @@ Expected (model loaded):
 {
     "procs": [
         {
-            "busId": "00000000:01:00.0",
-            "pid": 12345,
-            "container": "ix-ollama-ollama-1",
-            "binary": "/usr/bin/ollama",
-            "vramMb": 8432
+            "busId": "00000000:02:00.0",
+            "pid": 45392,
+            "container": "ollama",
+            "binary": "/usr/lib/ollama/llama-server",
+            "vramMb": 770
         }
     ]
 }
@@ -480,7 +501,7 @@ docker compose build && docker compose up -d
 ```
 
 Checklist in browser (`http://localhost:3788`):
-1. Click a GPU card running Ollama → modal shows container name (e.g. `ix-ollama-ollama-1`), binary `ollama`, PID, VRAM in MB
+1. Click a GPU card running Ollama → modal shows app name (e.g. `ollama`), binary basename (e.g. `llama-server`), PID, VRAM in MB
 2. Leave modal open ≥10 s → VRAM value updates with polling (load/unload a model to see change)
 3. Click a GPU card with no processes → "No processes"
 4. Close via ✕, backdrop click, and Escape — all three work
@@ -521,7 +542,7 @@ a) In the `## Architecture` endpoint tree, after the `GET /api/status` line add:
 b) In the `## Key technical decisions` table add a row:
 
 ```markdown
-| GPU process names | PID → `/proc/<pid>/cgroup` → `docker ps` on host | nvidia-smi reports only binary paths; container name (e.g. `ix-ollama-ollama-1`) is the meaningful label; single SSH round-trip keeps it atomic |
+| GPU process names | PID → `/proc/<pid>/cgroup` → `midclt call app.query` on host | nvidia-smi reports only binary paths; TrueNAS app name (e.g. `ollama`) is the meaningful label; `docker ps` not accessible to `truenas_admin`; single SSH round-trip keeps it atomic |
 ```
 
 c) In the `## Verification (local)` section, after the `curl .../api/gpu` line add:

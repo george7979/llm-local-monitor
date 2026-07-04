@@ -8,10 +8,12 @@
 ## Goal
 
 Make each GPU card in the dashboard clickable. Clicking opens a modal listing all compute
-processes running on that GPU, enriched with **Docker container names** (e.g.
-`ix-ollama-ollama-1`) instead of only the raw executable path that `nvidia-smi` reports
-(e.g. `/usr/bin/python3`). Raw binary name remains as fallback for processes that are not
-in a container or when enrichment fails.
+processes running on that GPU, enriched with **container names** instead of only the raw
+executable path that `nvidia-smi` reports (e.g. `/usr/bin/python3`). Names are resolved to
+**TrueNAS app names** (e.g. `ollama`, `whisper-asr-whisperx`) via `midclt call app.query` —
+verified on the live host 2026-07-04 (`docker ps` is not accessible to `truenas_admin`).
+Raw binary name remains as fallback for processes that are not in a container or when
+enrichment fails.
 
 ---
 
@@ -33,7 +35,7 @@ in a container or when enrichment fails.
 [TrueNAS host]                                [llm-local-monitor container]
 nvidia-smi compute-apps ─┐
 /proc/<pid>/cgroup       ├─ one bash script ──SSH──▶ collectors/gpuProcs.js ──▶ routes.js
-docker ps (ID→name)      ─┘                          (cached 2 s)               /api/status
+midclt app.query (ID→name)┘                          (cached 2 s)               /api/status
                                                                                    │
                                               public/app.js ◀── polling 5 s ──────┘
                                               GPU card (click) → modal with process table
@@ -43,10 +45,16 @@ docker ps (ID→name)      ─┘                          (cached 2 s)         
 
 1. `nvidia-smi --query-compute-apps=gpu_bus_id,pid,process_name,used_gpu_memory --format=csv,noheader,nounits`
 2. For each PID: read `/proc/<PID>/cgroup`, extract the 64-hex Docker container ID
-   (patterns: `docker-<id>.scope` or `/docker/<id>`)
-3. `docker ps --no-trunc --format '{{.ID}}\t{{.Names}}'` → ID→name map
+   (verified live format: `0::/docker/<64-hex-id>`)
+3. `midclt call app.query` → JSON with `active_workloads.container_details[].id` per app →
+   ID→app-name map (built with a small embedded python3 snippet; `docker ps` is NOT usable —
+   `truenas_admin` has no access to `/var/run/docker.sock` and no passwordless sudo)
 4. Emit one TSV line per process: `bus_id \t pid \t container_name \t binary_path \t vram_mb`
    (`container_name` = `-` when unresolved)
+
+Note: multi-container apps map all their containers to the app name (per-service granularity
+via `service_name` exists in `container_details` but is YAGNI for now). `midclt call app.query`
+takes ~1-2 s on the host — acceptable within the 2 s collector cache.
 
 PIDs reported by nvidia-smi are host-namespace PIDs, and `/proc/<PID>/cgroup` read on the
 host contains the container's cgroup path — this is why the whole mapping must happen
@@ -83,7 +91,7 @@ host-side in one session.
 | Failure | Behavior |
 |---------|----------|
 | PID→container mapping fails (host process, unknown cgroup) | `container: null`, frontend falls back to binary basename |
-| `docker ps` unavailable | All entries keep `container: null`; list still renders (degradation, not failure) |
+| `midclt call app.query` fails/unavailable | All entries keep `container: null`; list still renders (degradation, not failure) |
 | Process exits between nvidia-smi and cgroup read | Script skips that PID, continues |
 | Host offline | Collector skipped; card not clickable data-wise → modal shows "Host unavailable" |
 | GPU with no processes | Modal shows "No processes" |
