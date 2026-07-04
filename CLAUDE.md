@@ -54,6 +54,7 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama (host from env `LLM
 - `src/collectors/` — always return cached data (`cached('key', 2000, fn)`)
 - `src/collectors/ollama.js` — uses Ollama REST API (`/api/ps`), NOT SSH
 - `src/collectors/ollamaApp.js` — SSH midclt (app status) + cgroup files (CPU/RAM/IO/Net)
+- `src/collectors/gpuProcs.js` — per-GPU process list via SSH (nvidia-smi + /proc cgroup + midclt app.query); container/app name enrichment; `hasOllama` is derived from it in `routes.js`
 - `src/actions/` — NOT cached; each call = real action
 - `src/routes.js` — `/api/status` aggregates collectors via `Promise.all`; when host offline → SSH collectors skipped
 

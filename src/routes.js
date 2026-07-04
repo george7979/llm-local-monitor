@@ -6,6 +6,7 @@ import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getOllamaAppStats } from './collectors/ollamaApp.js';
 import { getGpuStatus } from './collectors/gpu.js';
+import { getGpuProcs } from './collectors/gpuProcs.js';
 import { getMemoryStatus } from './collectors/memory.js';
 import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
@@ -29,21 +30,35 @@ router.get('/status', async (_req, res) => {
     safeCollect(getHostStatus),
     safeCollect(getIpmiStatus),
   ]);
-  let ollama = null, gpu = null, memory = null, network = null;
+  let ollama = null, gpu = null, gpuProcs = null, memory = null, network = null;
 
   let uptime = null;
   if (host.alive) {
-    [ollama, gpu, memory, network, uptime] = await Promise.all([
+    [ollama, gpu, gpuProcs, memory, network, uptime] = await Promise.all([
       safeCollect(getOllamaStatus),
       safeCollect(getGpuStatus),
+      safeCollect(getGpuProcs),
       safeCollect(getMemoryStatus),
       safeCollect(getNetworkStatus),
       safeCollect(getUptime),
     ]);
   }
 
+  // Derive per-GPU ollama badge from the process list (matches old behavior;
+  // false when the process collector failed — badge degrades, card still renders).
+  // Copies, not mutation: the gpu objects live in the collector cache and are
+  // also served by /api/gpu, which must stay hasOllama-free.
+  if (gpu?.gpus) {
+    gpu = { ...gpu, gpus: gpu.gpus.map(g => ({
+      ...g,
+      hasOllama: !!gpuProcs?.procs?.some(p =>
+        p.busId === g.busId &&
+        `${p.container || ''} ${p.binary || ''}`.toLowerCase().includes('ollama')),
+    })) };
+  }
+
   const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;
-  res.json({ host, ipmi, uptime, ollama, ollamaApp, gpu, memory, network });
+  res.json({ host, ipmi, uptime, ollama, ollamaApp, gpu, gpuProcs, memory, network });
 });
 
 router.get('/ollama', async (_req, res) => {
@@ -56,6 +71,10 @@ router.get('/ollama-app', async (_req, res) => {
 
 router.get('/gpu', async (_req, res) => {
   res.json(await safeCollect(getGpuStatus));
+});
+
+router.get('/gpu-procs', async (_req, res) => {
+  res.json(await safeCollect(getGpuProcs));
 });
 
 router.get('/memory', async (_req, res) => {

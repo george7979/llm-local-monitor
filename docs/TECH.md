@@ -14,6 +14,7 @@ Browser (local network)
 Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── GET /api/config          → version, llmHost, truenasUrl, pollIntervalSec
   ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive
+  ├── GET /api/gpu-procs       → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
   ├── GET /api/check-update    → GitHub API (cached 1h server-side)
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
@@ -39,6 +40,7 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
 | Upgrade Ollama UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeOllamaApp(msgId)` routes feedback to the calling card |
+| GPU process names | PID → `/proc/<pid>/cgroup` → `midclt call app.query` on host | nvidia-smi reports only binary paths; TrueNAS app name (e.g. `ollama`) is the meaningful label; `docker ps` not accessible to `truenas_admin`; single SSH round-trip keeps it atomic |
 
 ---
 
@@ -202,6 +204,7 @@ curl http://localhost:3788/api/status | python3 -m json.tool
 # Individual panels
 curl http://localhost:3788/api/ollama
 curl http://localhost:3788/api/gpu
+curl http://localhost:3788/api/gpu-procs
 curl http://localhost:3788/api/memory
 curl http://localhost:3788/api/ollama-app
 
