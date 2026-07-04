@@ -95,14 +95,14 @@ Implementation details in `docs/TECH.md`. Most important architectural choices:
 
 ## Milestone: v1.3.0 — GPU process modal
 
-**Status:** 🔵 Implemented on `dev` (2026-07-04) — awaiting user testing on target server before release
+**Status:** ✅ Done (released 2026-07-04)
 
 | # | Task | Status |
 |---|------|--------|
 | 1 | `gpuProcs` collector: per-GPU process list via SSH (nvidia-smi + /proc cgroup + midclt app.query name enrichment) | ✅ Done |
 | 2 | `/api/gpu-procs` endpoint; `gpuProcs` aggregated into `/api/status`; `hasOllama` derived from it (gpu.js single query) | ✅ Done |
 | 3 | Clickable, keyboard-operable GPU cards → live-refreshing modal (Container/Binary/PID/VRAM) | ✅ Done |
-| 4 | User acceptance test on target server (Dockge) | ⏳ Pending |
+| 4 | User acceptance test on target server (Dockge) | ✅ Done |
 
 Spec: `docs/superpowers/specs/2026-07-04-gpu-process-modal-design.md`
 
