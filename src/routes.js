@@ -30,21 +30,32 @@ router.get('/status', async (_req, res) => {
     safeCollect(getHostStatus),
     safeCollect(getIpmiStatus),
   ]);
-  let ollama = null, gpu = null, memory = null, network = null;
+  let ollama = null, gpu = null, gpuProcs = null, memory = null, network = null;
 
   let uptime = null;
   if (host.alive) {
-    [ollama, gpu, memory, network, uptime] = await Promise.all([
+    [ollama, gpu, gpuProcs, memory, network, uptime] = await Promise.all([
       safeCollect(getOllamaStatus),
       safeCollect(getGpuStatus),
+      safeCollect(getGpuProcs),
       safeCollect(getMemoryStatus),
       safeCollect(getNetworkStatus),
       safeCollect(getUptime),
     ]);
   }
 
+  // Derive per-GPU ollama badge from the process list (matches old behavior;
+  // false when the process collector failed — badge degrades, card still renders)
+  if (gpu?.gpus) {
+    for (const g of gpu.gpus) {
+      g.hasOllama = !!gpuProcs?.procs?.some(p =>
+        p.busId === g.busId &&
+        `${p.container || ''} ${p.binary || ''}`.toLowerCase().includes('ollama'));
+    }
+  }
+
   const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;
-  res.json({ host, ipmi, uptime, ollama, ollamaApp, gpu, memory, network });
+  res.json({ host, ipmi, uptime, ollama, ollamaApp, gpu, gpuProcs, memory, network });
 });
 
 router.get('/ollama', async (_req, res) => {
