@@ -9,6 +9,10 @@ function el(tag, cls, text) {
   return e;
 }
 
+// ── GPU modal state ──────────────────────────────────────────────────
+let gpuModalBusId = null;
+let lastGpuSnapshot = { gpu: null, procs: null };
+
 // ── API ───────────────────────────────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
@@ -36,6 +40,8 @@ async function pollAll() {
     renderOllama(data.ollama);
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
+    lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
+    if (gpuModalBusId) renderGpuModal();
     renderMemory(data.memory);
     renderNetwork(data.network);
     document.getElementById('server-uptime').textContent =
@@ -174,6 +180,12 @@ function renderGpu(data) {
 
   data.gpus.forEach((g) => {
     const card = el('div', 'gpu-card');
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.addEventListener('click', () => openGpuModal(g.busId));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGpuModal(g.busId); }
+    });
 
     // Header row
     const top = el('div', 'gpu-card-top');
@@ -217,6 +229,74 @@ function makeGpuBar(label, valText, pct, fillCls) {
   row.appendChild(head);
   row.appendChild(track);
   return row;
+}
+
+// ── GPU process modal ─────────────────────────────────────────────────
+
+function openGpuModal(busId) {
+  gpuModalBusId = busId;
+  renderGpuModal();
+  document.getElementById('gpu-modal').style.display = 'flex';
+  document.getElementById('gpu-modal-close').focus();
+}
+
+function closeGpuModal() {
+  gpuModalBusId = null;
+  document.getElementById('gpu-modal').style.display = 'none';
+}
+
+document.getElementById('gpu-modal-close').addEventListener('click', closeGpuModal);
+document.getElementById('gpu-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeGpuModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && gpuModalBusId) closeGpuModal();
+});
+
+function renderGpuModal() {
+  const { gpu, procs } = lastGpuSnapshot;
+  const g = gpu?.gpus?.find(x => x.busId === gpuModalBusId);
+  document.getElementById('gpu-modal-title').textContent =
+    g ? `${g.name} #${g.index} — processes` : 'GPU processes';
+  document.getElementById('gpu-modal-sub').textContent = gpuModalBusId || '';
+
+  const body = document.getElementById('gpu-modal-body');
+  body.textContent = '';
+
+  if (!gpu) { body.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
+  if (procs?.error) { body.appendChild(el('span', 'dim-text', 'Process list temporarily unavailable')); return; }
+
+  const list = (procs?.procs || []).filter(p => p.busId === gpuModalBusId);
+  if (!list.length) { body.appendChild(el('span', 'dim-text', 'No processes')); return; }
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Container', 'Binary', 'PID', 'VRAM'].forEach(h => hr.appendChild(el('th', null, h)));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const p of list) {
+    const tr = document.createElement('tr');
+    const basename = (p.binary || '').split('/').pop() || '—';
+    const cells = [
+      ['td-model', p.container || '—', null],
+      ['td-mono',  basename, p.binary || null],
+      ['td-mono',  String(p.pid), null],
+      ['td-mono',  p.vramMb ? p.vramMb.toLocaleString() + ' MB' : '—', null],
+    ];
+    cells.forEach(([cls, val, title]) => {
+      const td = document.createElement('td');
+      td.className = cls;
+      td.textContent = val;
+      if (title) td.title = title;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  body.appendChild(table);
 }
 
 // ── Ollama App ────────────────────────────────────────────────────────
