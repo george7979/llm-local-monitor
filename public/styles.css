@@ -560,7 +560,7 @@ tbody tr:last-child td { border-bottom: none; }
   border: 1px solid var(--border2);
   border-radius: var(--r);
   padding: 20px 22px;
-  min-width: 420px; max-width: 90vw;
+  min-width: min(420px, calc(100vw - 32px)); max-width: 90vw;
   max-height: 80vh; overflow: auto;
 }
 .modal-head {
@@ -571,9 +571,10 @@ tbody tr:last-child td { border-bottom: none; }
 .modal-sub   { font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 2px; }
 .modal-close {
   background: none; border: none; color: var(--dim);
+  width: auto; flex: 0 0 auto;
   font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;
 }
-.modal-close:hover { color: var(--text); }
+button.modal-close:hover { color: var(--text); background: none; }
 
 /* ── LIGHT THEME ───────────────────────────── */
 
