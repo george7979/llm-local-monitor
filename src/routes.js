@@ -45,13 +45,16 @@ router.get('/status', async (_req, res) => {
   }
 
   // Derive per-GPU ollama badge from the process list (matches old behavior;
-  // false when the process collector failed — badge degrades, card still renders)
+  // false when the process collector failed — badge degrades, card still renders).
+  // Copies, not mutation: the gpu objects live in the collector cache and are
+  // also served by /api/gpu, which must stay hasOllama-free.
   if (gpu?.gpus) {
-    for (const g of gpu.gpus) {
-      g.hasOllama = !!gpuProcs?.procs?.some(p =>
+    gpu = { ...gpu, gpus: gpu.gpus.map(g => ({
+      ...g,
+      hasOllama: !!gpuProcs?.procs?.some(p =>
         p.busId === g.busId &&
-        `${p.container || ''} ${p.binary || ''}`.toLowerCase().includes('ollama'));
-    }
+        `${p.container || ''} ${p.binary || ''}`.toLowerCase().includes('ollama')),
+    })) };
   }
 
   const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;

@@ -264,7 +264,7 @@ function renderGpuModal() {
   body.textContent = '';
 
   if (!gpu) { body.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
-  if (procs?.error) { body.appendChild(el('span', 'dim-text', 'Process list temporarily unavailable')); return; }
+  if (gpu.error || !procs || procs.error) { body.appendChild(el('span', 'dim-text', 'Process list temporarily unavailable')); return; }
 
   const list = (procs?.procs || []).filter(p => p.busId === gpuModalBusId);
   if (!list.length) { body.appendChild(el('span', 'dim-text', 'No processes')); return; }
@@ -284,7 +284,7 @@ function renderGpuModal() {
       ['td-model', p.container || '—', null],
       ['td-mono',  basename, p.binary || null],
       ['td-mono',  String(p.pid), null],
-      ['td-mono',  p.vramMb ? p.vramMb.toLocaleString() + ' MB' : '—', null],
+      ['td-mono',  p.vramMb != null ? p.vramMb.toLocaleString() + ' MB' : '—', null],
     ];
     cells.forEach(([cls, val, title]) => {
       const td = document.createElement('td');
