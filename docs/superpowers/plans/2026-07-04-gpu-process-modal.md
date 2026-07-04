@@ -4,7 +4,7 @@
 
 **Goal:** Clickable GPU cards opening a live-refreshing modal that lists all compute processes on that GPU, enriched with Docker container names.
 
-**Architecture:** One new SSH collector (`gpuProcs.js`) runs a single bash pipeline on the TrueNAS host (nvidia-smi → /proc/PID/cgroup → docker ps) and returns per-process rows. `routes.js` aggregates it into `/api/status` and derives the existing `hasOllama` flag from it; `gpu.js` loses its second nvidia-smi query. Frontend adds a theme-aware modal fed by the existing 5 s polling.
+**Architecture:** One new SSH collector (`gpuProcs.js`) runs a single bash pipeline on the TrueNAS host (nvidia-smi → /proc/PID/cgroup → midclt app.query) and returns per-process rows. `routes.js` aggregates it into `/api/status` and derives the existing `hasOllama` flag from it; `gpu.js` loses its second nvidia-smi query. Frontend adds a theme-aware modal fed by the existing 5 s polling.
 
 **Tech Stack:** Express 5 ESM, SSH via `sshExec`, vanilla JS/CSS frontend, Docker deploy.
 
@@ -92,7 +92,7 @@ No commit (nothing in repo changed).
 - Create: `src/collectors/gpuProcs.js`
 - Modify: `src/routes.js` (imports + new GET route only; `/api/status` aggregation comes in Task 3)
 
-- [ ] **Step 1: Create `src/collectors/gpuProcs.js`**
+- [x] **Step 1: Create `src/collectors/gpuProcs.js`**
 
 ⚠️ **Gotcha:** the script lives in a JS template literal, so every shell `${...}` parameter expansion MUST be escaped as `\${...}` or Node will try to interpolate it. `$(...)` needs no escaping.
 
@@ -152,7 +152,7 @@ export function getGpuProcs() {
 }
 ```
 
-- [ ] **Step 2: Add the debug endpoint in `src/routes.js`**
+- [x] **Step 2: Add the debug endpoint in `src/routes.js`**
 
 Add to the imports block (after the `getGpuStatus` import, line 8):
 
@@ -168,7 +168,7 @@ router.get('/gpu-procs', async (_req, res) => {
 });
 ```
 
-- [ ] **Step 3: Rebuild and verify via curl**
+- [x] **Step 3: Rebuild and verify via curl**
 
 ```bash
 cd /home/jerzy/cursor/llm-local-monitor
@@ -195,7 +195,7 @@ Expected (model loaded):
 
 Expected (no processes): `{"procs": []}`. On SSH failure: `{"error": "..."}` (via `safeCollect`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/collectors/gpuProcs.js src/routes.js
@@ -210,7 +210,7 @@ git commit -m "feat: add gpuProcs collector — per-GPU process list with contai
 - Modify: `src/collectors/gpu.js:17-48`
 - Modify: `src/routes.js:27-47` (`/status` handler)
 
-- [ ] **Step 1: Strip the compute-apps query from `src/collectors/gpu.js`**
+- [x] **Step 1: Strip the compute-apps query from `src/collectors/gpu.js`**
 
 Replace the body of `getGpuStatus()` — remove the `Promise.all`, the `appsOutput` query, the `ollamaBusIds` set, and the `hasOllama` property:
 
@@ -242,7 +242,7 @@ export function getGpuStatus() {
 
 Imports: `Promise.all` gone but both imports (`sshExec`, `cached`) are still used — leave them.
 
-- [ ] **Step 2: Aggregate `gpuProcs` in `/api/status` and derive `hasOllama`**
+- [x] **Step 2: Aggregate `gpuProcs` in `/api/status` and derive `hasOllama`**
 
 In `src/routes.js`, replace the `/status` handler body (lines 27-47) with:
 
@@ -281,7 +281,7 @@ router.get('/status', async (_req, res) => {
 });
 ```
 
-- [ ] **Step 3: Rebuild and verify `/api/status`**
+- [x] **Step 3: Rebuild and verify `/api/status`**
 
 ```bash
 docker compose build && docker compose up -d
@@ -295,11 +295,11 @@ print('hasOllama per GPU:', [(g['index'], g['hasOllama']) for g in d['gpu']['gpu
 
 Expected: `gpuProcs.procs` array present; `hasOllama` is `true` exactly for GPUs where an ollama container/binary appears in `procs` (compare with the OLLAMA badge on the dashboard before this change).
 
-- [ ] **Step 4: Verify the badge still renders in the browser**
+- [x] **Step 4: Verify the badge still renders in the browser**
 
 Open `http://localhost:3788` — GPU running Ollama shows the `OLLAMA` badge exactly as before the refactor.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/collectors/gpu.js src/routes.js
@@ -314,7 +314,7 @@ git commit -m "refactor: derive hasOllama from gpuProcs; drop duplicate nvidia-s
 - Modify: `public/index.html` (add modal container before `<script src="app.js">`)
 - Modify: `public/styles.css` (append modal section; add `cursor: pointer` to `.gpu-card`)
 
-- [ ] **Step 1: Add modal HTML to `public/index.html`**
+- [x] **Step 1: Add modal HTML to `public/index.html`**
 
 Insert between `</main>` (line 101) and `<script src="app.js"></script>` (line 103):
 
@@ -335,7 +335,7 @@ Insert between `</main>` (line 101) and `<script src="app.js"></script>` (line 1
 
 (No inline `onclick` — handlers are attached in app.js in Task 5.)
 
-- [ ] **Step 2: Append modal CSS to `public/styles.css`**
+- [x] **Step 2: Append modal CSS to `public/styles.css`**
 
 Add at the end of the main (dark) section, before the `[data-theme="light"]` overrides block (which starts around line 550):
 
@@ -372,7 +372,7 @@ Add at the end of the main (dark) section, before the `[data-theme="light"]` ove
 
 Theme awareness is free: `--card`, `--border2`, `--dim`, `--text` are already overridden in the `[data-theme="light"]` block, and the modal table reuses the global `table`/`thead th`/`tbody td` styles (including the light-theme row-divider fix at line ~589).
 
-- [ ] **Step 3: Visual sanity check**
+- [x] **Step 3: Visual sanity check**
 
 ```bash
 docker compose build && docker compose up -d
@@ -380,7 +380,7 @@ docker compose build && docker compose up -d
 
 In browser devtools console: `document.getElementById('gpu-modal').style.display = 'flex'` — empty modal appears centered, correct colors in both themes (toggle ☀/☾). Set back to `'none'`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add public/index.html public/styles.css
@@ -394,7 +394,7 @@ git commit -m "feat: GPU process modal markup and styles"
 **Files:**
 - Modify: `public/app.js` (snapshot state, `pollAll`, `renderGpu` click handler, new modal functions)
 
-- [ ] **Step 1: Add snapshot state and modal wiring near the top of `app.js`**
+- [x] **Step 1: Add snapshot state and modal wiring near the top of `app.js`**
 
 After the Helpers section (below line 10):
 
@@ -404,7 +404,7 @@ let gpuModalBusId = null;
 let lastGpuSnapshot = { gpu: null, procs: null };
 ```
 
-- [ ] **Step 2: Feed the snapshot from `pollAll` and refresh an open modal**
+- [x] **Step 2: Feed the snapshot from `pollAll` and refresh an open modal**
 
 In `pollAll()` (line 32), after `renderGpu(data.gpu);` add:
 
@@ -413,7 +413,7 @@ In `pollAll()` (line 32), after `renderGpu(data.gpu);` add:
     if (gpuModalBusId) renderGpuModal();
 ```
 
-- [ ] **Step 3: Make cards clickable in `renderGpu`**
+- [x] **Step 3: Make cards clickable in `renderGpu`**
 
 In the `data.gpus.forEach((g) => {` loop, right after `const card = el('div', 'gpu-card');` (line 176), add:
 
@@ -428,7 +428,7 @@ In the `data.gpus.forEach((g) => {` loop, right after `const card = el('div', 'g
 
 (Keyboard access added per Task 4 code review — cards are divs, so they need `role`/`tabindex`/keydown to be operable without a mouse.)
 
-- [ ] **Step 4: Add modal functions (new section after `makeGpuBar`, ~line 220)**
+- [x] **Step 4: Add modal functions (new section after `makeGpuBar`, ~line 220)**
 
 ```js
 // ── GPU process modal ─────────────────────────────────────────────────
@@ -502,7 +502,7 @@ function renderGpuModal() {
 
 Fallback per spec: `container` null → `—` in the Container column; the Binary column always shows the basename with the full path in the tooltip.
 
-- [ ] **Step 5: Rebuild and click-test**
+- [x] **Step 5: Rebuild and click-test**
 
 ```bash
 docker compose build && docker compose up -d
@@ -516,7 +516,7 @@ Checklist in browser (`http://localhost:3788`):
 5. Toggle light theme with modal open → colors correct
 6. `OLLAMA` badge on cards unchanged
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add public/app.js
@@ -531,20 +531,20 @@ git commit -m "feat: clickable GPU cards open live process modal"
 - Modify: `CLAUDE.md` (Architecture Notes)
 - Modify: `docs/TECH.md` (architecture section — match its existing structure when editing)
 
-- [ ] **Step 1: Add collector to `CLAUDE.md` Architecture Notes**
+- [x] **Step 1: Add collector to `CLAUDE.md` Architecture Notes**
 
 After the line describing `src/collectors/ollamaApp.js` add:
 
 ```markdown
-- `src/collectors/gpuProcs.js` — per-GPU process list via SSH (nvidia-smi + /proc cgroup + docker ps); container name enrichment; `hasOllama` is derived from it in `routes.js`
+- `src/collectors/gpuProcs.js` — per-GPU process list via SSH (nvidia-smi + /proc cgroup + midclt app.query); container/app name enrichment; `hasOllama` is derived from it in `routes.js`
 ```
 
-- [ ] **Step 2: Update `docs/TECH.md`** (three spots)
+- [x] **Step 2: Update `docs/TECH.md`** (three spots)
 
 a) In the `## Architecture` endpoint tree, after the `GET /api/status` line add:
 
 ```
-  ├── GET /api/gpu-procs        → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + docker ps
+  ├── GET /api/gpu-procs       → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
 ```
 
 b) In the `## Key technical decisions` table add a row:
@@ -559,7 +559,7 @@ c) In the `## Verification (local)` section, after the `curl .../api/gpu` line a
 curl http://localhost:3788/api/gpu-procs
 ```
 
-- [ ] **Step 3: Full manual regression per project convention**
+- [x] **Step 3: Full manual regression per project convention**
 
 ```bash
 curl -s http://localhost:3788/healthz
@@ -569,7 +569,7 @@ curl -s http://localhost:3788/api/gpu-procs | python3 -m json.tool
 
 Expected: all 200, `gpuProcs` present in status. Then one last dashboard click-through (Task 5 checklist, short form). Host-offline case: if practical, test "Host unavailable" in modal (e.g. while host is asleep).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add CLAUDE.md docs/TECH.md
