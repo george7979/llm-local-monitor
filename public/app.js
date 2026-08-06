@@ -1,7 +1,6 @@
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function gb(bytes) { return (bytes / 1073741824).toFixed(1); }
-function shortName(s) { return s.length > 30 ? s.slice(0, 28) + '…' : s; }
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -146,7 +145,7 @@ function renderOllama(data) {
       : 'td-cpu';
 
     const cells = [
-      ['td-model', shortName(m.name), m.name],
+      ['td-model', m.name, m.name],
       ['td-mono',  m.parameterSize, null],
       ['td-mono',  m.quantization, null],
       [procCls,    m.processor, null],
