@@ -12,6 +12,49 @@ function el(tag, cls, text) {
 let gpuModalBusId = null;
 let lastGpuSnapshot = { gpu: null, procs: null };
 
+// ── Model state ──────────────────────────────────────────────────────
+const PENDING_KEY = 'pendingModelLoad';
+const PENDING_MAX_MS = 15 * 60 * 1000;   // drop a stale marker after 15 min
+const PENDING_WARN_MS = 10 * 60 * 1000;  // 10 min: say it is taking unusually long
+
+let pendingLoad = null;       // { model, startedAt } — cosmetic only
+let lastLoadedModels = [];    // latest /api/ps snapshot, for the modal markers
+let modelsModalOpen = false;  // declared here, used by the model browser modal
+
+function readPending() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p?.model || !p?.startedAt) throw new Error('malformed');
+    if (Date.now() - p.startedAt > PENDING_MAX_MS) throw new Error('stale');
+    return p;
+  } catch {
+    localStorage.removeItem(PENDING_KEY);
+    return null;
+  }
+}
+
+function setPending(model) {
+  pendingLoad = { model, startedAt: Date.now() };
+  localStorage.setItem(PENDING_KEY, JSON.stringify(pendingLoad));
+}
+
+function clearPending() {
+  pendingLoad = null;
+  localStorage.removeItem(PENDING_KEY);
+}
+
+function ghostLabel(startedAt) {
+  const s = Math.floor((Date.now() - startedAt) / 1000);
+  const t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return (Date.now() - startedAt) >= PENDING_WARN_MS
+    ? `loading ${t} — still waiting`
+    : `loading… ${t}`;
+}
+
+pendingLoad = readPending();
+
 // ── API ───────────────────────────────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
@@ -37,6 +80,8 @@ async function pollAll() {
     const data = await apiFetch('/api/status');
     renderStatus(data.host, data.ipmi, data.ollamaApp);
     renderOllama(data.ollama);
+    lastLoadedModels = data.ollama?.models || [];
+    if (modelsModalOpen) renderModelsModal();
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
     lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
@@ -117,9 +162,16 @@ function renderOllama(data) {
   const wrap = document.getElementById('ollama-content');
   wrap.textContent = '';
 
+  const models = data && !data.error ? (data.models || []) : null;
+
+  // /api/ps is authoritative: the model showing up IS the success signal.
+  if (models && pendingLoad && models.some(m => m.name === pendingLoad.model)) {
+    clearPending();
+  }
+
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
-  if (!data.models?.length) {
+  if (!models.length && !pendingLoad) {
     wrap.appendChild(el('span', 'dim-text', 'No models loaded'));
     return;
   }
@@ -127,16 +179,30 @@ function renderOllama(data) {
   const table = document.createElement('table');
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
-  ['Model', 'Params', 'Quant', 'Processor', 'VRAM', 'Ctx', 'Expires'].forEach(h => {
+  ['Model', 'Params', 'Quant', 'Processor', 'VRAM', 'Ctx', 'Expires', ''].forEach(h => {
     hr.appendChild(el('th', null, h));
   });
   thead.appendChild(hr);
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  for (const m of data.models) {
+
+  if (pendingLoad) {
+    const tr = el('tr', 'ghost-row');
+    tr.appendChild(el('td', 'td-model', pendingLoad.model));
+    const tdMsg = el('td', 'dim-text', ghostLabel(pendingLoad.startedAt));
+    tdMsg.colSpan = 7;
+    tr.appendChild(tdMsg);
+    tbody.appendChild(tr);
+  }
+
+  for (const m of models) {
     const tr = document.createElement('tr');
-    const expires = m.expiresAt ? new Date(m.expiresAt).toLocaleTimeString() : '—';
+    // keep_alive:-1 lands ~300 years out; anything past a day is effectively never
+    const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
+    const expires = !expiresMs ? '—'
+      : expiresMs - Date.now() > 86_400_000 ? '∞'
+      : new Date(expiresMs).toLocaleTimeString();
     const vram    = m.sizeVram  ? gb(m.sizeVram) + ' GB' : '—';
     const ctx     = m.contextLength ? Math.round(m.contextLength / 1000) + 'k' : '—';
 
@@ -161,6 +227,13 @@ function renderOllama(data) {
       if (title) td.title = title;
       tr.appendChild(td);
     });
+
+    const tdAct = el('td', 'td-actions');
+    const btn = el('button', 'btn-small', 'Unload');
+    btn.addEventListener('click', () => doModelAction('unload', m.name));
+    tdAct.appendChild(btn);
+    tr.appendChild(tdAct);
+
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
@@ -657,6 +730,41 @@ async function upgradeOllamaApp(msgId = 'ollama-upgrade-msg') {
     msg.textContent = 'Error: ' + e.message;
   }
   setTimeout(() => { msg.textContent = ''; }, 15000);
+}
+
+// Kept separate from action() below: that one is name-keyed with hardcoded
+// message maps and takes no arguments; these are parameterised by model name.
+async function doModelAction(kind, name) {
+  if (kind === 'unload' &&
+      !confirm(`Unload ${name}?\nVRAM is freed immediately; reloading can take minutes.`)) {
+    return;
+  }
+
+  const msg = document.getElementById(modelsModalOpen ? 'models-msg' : 'models-card-msg');
+
+  if (kind === 'load') setPending(name);
+  if (modelsModalOpen) renderModelsModal();
+  msg.textContent = kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`;
+
+  try {
+    await apiFetch(`/api/${kind}-model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name }),
+    });
+    msg.textContent = kind === 'load'
+      ? 'Load requested — watching for it to appear.'
+      : `Unloaded ${name}`;
+  } catch (e) {
+    // Any failure is a real failure: Ollama cancels an in-progress load when
+    // the client disconnects, so a timeout means the work was thrown away.
+    if (kind === 'load') clearPending();
+    msg.textContent = /timeout/i.test(e.message)
+      ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
+      : 'Error: ' + e.message;
+  }
+  setTimeout(() => { msg.textContent = ''; }, 15000);
+  pollAll();
 }
 
 async function action(name) {

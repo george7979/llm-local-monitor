@@ -638,3 +638,14 @@ button.modal-close:hover { color: var(--text); background: none; }
   background: rgba(240,68,56,.08);
   border-color: rgba(240,68,56,.4);
 }
+
+/* ── Model actions ─────────────────────────────────────────────────── */
+.btn-small {
+  width: auto;                 /* base `button` is width:100% */
+  padding: 3px 10px;
+  font-size: 12px;
+  justify-content: center;
+}
+tr.ghost-row td { opacity: .55; font-style: italic; }
+td.td-actions { text-align: right; white-space: nowrap; padding-right: 0; }
+td.td-actions button { display: inline-flex; }

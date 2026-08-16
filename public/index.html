@@ -88,8 +88,12 @@
   </div>
 
   <div class="card" id="card-ollama">
-    <div class="card-label">LOADED MODELS</div>
+    <div class="card-label-row">
+      <div class="card-label">LOADED MODELS</div>
+      <button id="btn-models" class="btn-small" onclick="openModelsModal()">Models&hellip;</button>
+    </div>
     <div id="ollama-content"><span class="dim-text">Loading...</span></div>
+    <div class="action-msg" id="models-card-msg"></div>
   </div>
 
   <div class="card" id="card-gpu">
