@@ -36,6 +36,10 @@ HTTP calls to Ollama, SSH, and all browser code are verified manually, exactly a
 specifies. `public/app.js` is a classic script, not an ES module, so it cannot be imported by
 a test runner; restructuring it into modules is out of scope for this change.
 
+The glob in the `test` script is not cosmetic: on Node 24, `node --test test/` treats the
+directory as an entry module and dies with `MODULE_NOT_FOUND` before running anything —
+a failure that looks deceptively like a missing import in the code under test.
+
 This is a deliberate narrowing of TDD to where it earns its keep in this codebase. If the
 reviewer wants broader coverage, that is a separate change.
 
@@ -102,7 +106,7 @@ test('findModel matches exactly and rejects junk input', () => {
 Add the runner to `package.json` scripts (keep `start` and `dev` unchanged):
 
 ```json
-"test": "node --test test/"
+"test": "node --test test/*.test.js"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
