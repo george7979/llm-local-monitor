@@ -121,9 +121,10 @@ Spec: `docs/superpowers/specs/2026-07-04-gpu-process-modal-design.md`
 | 5 | End-to-end verification in browser (load, F5 mid-load, failure paths, external changes) | ✅ Done |
 | 6 | Documentation | ✅ Done |
 | 7 | Reverse proxy check — Nginx at `ollama-monitor.techgraft.net`; a 504 does **not** cancel the load, only the UI feedback. 502/504 now handled as "still watching" | ✅ Done |
-| 8 | Raise `proxy_read_timeout` to 1800 s in Nginx (cosmetic, not required) | ⬜ To do |
+| 8 | Raise `proxy_read_timeout` to 1800 s in Nginx | ❌ Won't do — decided 2026-08-17. Purely cosmetic: loads complete either way, and "The proxy stopped waiting" after ~60 s is acceptable feedback |
 | 9 | User acceptance test on target server (Dockge, `#dev` build) | ✅ Done |
 | 10 | Fixes found during acceptance: embedding models rejected by `/api/generate`, proxy 502/504 misreported as failure, RAM panel using `MemFree`, `Expires` glyph illegible | ✅ Done |
+| 11 | Point the Dockge stack back at `#main` and rebuild on v1.4.0 | 🚧 Operator, 2026-08-17 |
 
 Spec: `docs/superpowers/specs/2026-08-16-model-load-unload-design.md`
 Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
