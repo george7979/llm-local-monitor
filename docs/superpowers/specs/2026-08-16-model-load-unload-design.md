@@ -175,8 +175,8 @@ POST /api/unload-model  { model }
 POST handlers follow the existing `try / catch / res.status(500).json({error})` shape used by
 `/api/wake`, `/api/sleep`, `/api/restart-ollama`.
 
-**`express.json()` must be added** to the app — no current action reads a request body, so
-the JSON body parser is almost certainly not registered.
+`express.json()` is **already registered** (`server.js:9`), so JSON bodies work without any
+change to the server entry point.
 
 ### Validation
 
@@ -196,7 +196,8 @@ Ctx · Expires`) gains:
 
 - An **eighth column** with a per-row **Unload** button. `confirm()` before sending, matching
   the convention in `public/app.js:663` where disruptive actions confirm and benign ones do not.
-- A **Models…** button below the table, opening the modal.
+- A **Models…** button in the card header row (reusing the existing `card-label-row` class,
+  as `card-ollama-app` already does), opening the modal.
 - Support for **ghost rows** — a pending load renders as a dimmed row showing the model name
   and elapsed time (`loading… 3:42`), before the real rows.
 
