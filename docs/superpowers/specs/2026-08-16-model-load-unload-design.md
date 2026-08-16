@@ -39,9 +39,15 @@ most decisions below:
 - **`keep_alive` needs no UI control.** The server default already expresses the intent;
   a per-load selector would duplicate an existing decision.
 
-> **Verification item:** `OLLAMA_KEEP_ALIVE=-1` is taken from the operator's statement, not
-> yet confirmed against the running container. Confirm during implementation
-> (`midclt call app.query` / `docker inspect` on the Ollama app) and record the result here.
+**Verified 2026-08-16:** `/api/ps` reports `expires_at: "2318-11-26T…"` for a freshly loaded
+model — roughly 300 years out, which is how Ollama encodes an infinite `keep_alive`. The
+setting is confirmed in effect without needing to inspect the container.
+
+Also observed: `OLLAMA_CONTEXT_LENGTH` is far above Ollama's 4096 default — a 1.1 B model
+loaded with `context_length: 131072`, and `gemma4:26b-a4b-it-q8_0` with `262144`. The
+practical consequence is that the KV cache dominates VRAM: that 26 GB model occupies
+**55.9 GB** of VRAM once resident. With ~76 GB total across the six GPUs, a second large
+model rarely fits, so eviction is the normal case rather than an edge case.
 
 ---
 
@@ -149,20 +155,31 @@ collector agent in `ollama.js` uses 8 s timeouts, appropriate for a 5 s poll and
 short for a model load.
 
 ```js
-modelActionTimeoutSec: Math.max(30, parseInt(process.env.MODEL_ACTION_TIMEOUT_SEC, 10) || 300)
+modelActionTimeoutSec: Math.max(30, parseInt(process.env.MODEL_ACTION_TIMEOUT_SEC, 10) || 1800)
 ```
 
-The value is **not critical**, because a timeout on our side does not cancel the load on
-Ollama's side — the model finishes loading regardless and appears in `/api/ps`. The timeout
-merely releases the socket. 300 s is a generous default; the env var exists so it can be
-raised without rebuilding the image.
+The value **is critical**. An earlier draft of this spec assumed a client-side timeout would
+not affect Ollama. **That assumption was wrong** — measured on the live host 2026-08-16:
 
-The same reasoning makes any reverse proxy in front of the dashboard a non-issue: a proxy
-cutting the connection at 60 s does not abort the load, and the poll still reports success.
+| Attempt | Client timeout | Result |
+|---------|---------------|--------|
+| `gemma4:26b-a4b-it-q8_0` | aborted at 20 s | never loaded; absent from `/api/ps` 7 min later |
+| same model | 300 s | `Headers Timeout Error`; never loaded |
+| same model | 1800 s | `{"ok":true}` after 127 s, resident |
 
-> **Open question (non-blocking):** is the dashboard reached directly on port 3788, or through
-> a reverse proxy (Nginx / Traefik / Cloudflare Tunnel)? Record the answer here for future
-> reference.
+**Ollama cancels an in-progress load when the HTTP client disconnects.** A timeout therefore
+destroys minutes of work rather than merely releasing a socket.
+
+Measured load times for a 28 GB model: **303 s cold** (read from the ZFS pool) and **127 s
+warm** (served from ARC) — a 2.4× spread, which is why the default cannot be fitted tightly
+to a warm-cache measurement. At the observed ~92 MB/s, the largest installed model
+(`qwen3-coder-next`, 48 GB) needs roughly 9 minutes cold. The 1800 s default leaves headroom;
+the env var exists so it can be raised without rebuilding the image.
+
+> **Blocking question:** is the deployed dashboard reached directly on port 3788, or through a
+> reverse proxy (Nginx / Traefik / Cloudflare Tunnel)? A proxy with the usual 60 s
+> `proxy_read_timeout` will kill every load of a large model, and no application-side setting
+> can compensate. Local development connects directly, so this cannot be caught in dev.
 
 ### Routes (`src/routes.js`)
 
@@ -232,13 +249,13 @@ separate parameterised function sits alongside it, sharing only `apiFetch`.
 |--------|---------|-------------|
 | Model appears in `/api/ps` | **Loaded** — the only reliable success signal | ghost row → real row; modal button → Unload |
 | Fast HTTP error (404 / 500) | Real failure: unknown model, Ollama down | show error, drop ghost row |
-| Timeout / dropped connection | **Nothing** — the load continues server-side | ignore; keep watching |
-| Nothing after 10 min | Probably wrong | ghost row shows `loading 10:00 — check Ollama logs`; row remains |
+| Timeout / dropped connection | **Failure** — Ollama cancelled the load | drop ghost row, report that the load was aborted and must be retried |
+| Nothing after 10 min, connection still open | Load is slow but alive | ghost row shows `loading 10:00 — still waiting`; row remains |
 
-> **Verification item:** does `/api/ps` list a model only once fully resident, or as soon as
-> the runner starts (with `size_vram` still growing)? If the latter, appearance alone is a
-> premature success signal and the condition must be `size_vram > 0` or a stabilised value.
-> Determine empirically on the first real load and update this table.
+**Verified 2026-08-16:** `/api/ps` returns an empty list for the entire duration of a load and
+lists the model only once it is fully resident — polled every 3 s across a 303 s load, the
+model never appeared early with a partial `size_vram`. Appearance is therefore a reliable
+success signal and needs no `size_vram > 0` guard.
 
 ### Concurrency with external clients
 
@@ -273,6 +290,11 @@ the precedent in `public/theme.js`.
 On page init the entry is read back and the ghost row re-rendered with elapsed time computed
 from `startedAt`. The entry is cleared when the model appears in `/api/ps`, or after 15 min.
 
+Reloading the page does **not** cancel a load. The connection that Ollama requires to stay
+open runs between the backend and Ollama; the browser's `fetch` dying does not abort the
+`undici` request, because no `AbortSignal` is wired to client disconnect. Restarting the
+backend, however, does kill it.
+
 This is cosmetic state only. Truth always comes from `/api/ps`, so a stale or corrupt entry
 cannot desynchronise anything — the worst case is a ghost row lingering for 15 minutes
 beside a fully correct card.
@@ -289,7 +311,7 @@ this design deliberately rejects.
 |-----------|---------|-----|
 | Model not in `/api/tags` | `400 Unknown model` | `No such model` |
 | Ollama unreachable | `500` + message | error text, ghost row dropped |
-| Load exceeds timeout | `500` timeout | **not** shown as failure — keep watching |
+| Load exceeds timeout | `500` timeout | shown as failure — Ollama cancelled the load, it must be retried |
 | VRAM pressure | Ollama evicts other resident models to fit | card shows the eviction within one poll cycle — expected behaviour, not an app error |
 | Model too large even after eviction | Ollama succeeds, spills to CPU | card shows `x% GPU / y% CPU` — expected Ollama behaviour, not an app error |
 | Unload during active generation | succeeds | eviction occurs after the in-flight request finishes |

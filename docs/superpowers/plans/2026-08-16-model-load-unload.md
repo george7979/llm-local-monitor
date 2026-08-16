@@ -20,7 +20,7 @@
 - **Commits require explicit user consent** (workspace `CLAUDE.md`). Every "Commit" step below means: show the file list, ask, wait for a yes. Never run `git commit` or `git push` unprompted.
 - **Exact values from the spec:**
   - cache key for the new collector: `ollama-models`, TTL `2_000` ms
-  - env var: `MODEL_ACTION_TIMEOUT_SEC`, default `300`, floor `30`
+  - env var: `MODEL_ACTION_TIMEOUT_SEC`, default `1800`, floor `30`
   - `localStorage` key: `pendingModelLoad`, shape `{ model, startedAt }`, expiry 15 min
   - ghost-row warning threshold: 10 min
   - load payload: `{ model, prompt: "", stream: false, keep_alive: -1 }`
@@ -228,16 +228,18 @@ git commit -m "feat: expose installed Ollama models via GET /api/models"
 In `src/config.js`, inside the exported `cfg` object, next to `pollIntervalSec`:
 
 ```js
-  modelActionTimeoutSec: Math.max(30, parseInt(process.env.MODEL_ACTION_TIMEOUT_SEC, 10) || 300),
+  modelActionTimeoutSec: Math.max(30, parseInt(process.env.MODEL_ACTION_TIMEOUT_SEC, 10) || 1800),
 ```
 
 Append to `.env.example`:
 
 ```
-# Socket timeout for model load/unload requests to Ollama (seconds).
-# Not critical: exceeding it does NOT cancel the load on Ollama's side —
-# the model finishes loading and appears in /api/ps regardless.
-MODEL_ACTION_TIMEOUT_SEC=300
+# Socket timeout for model load/unload requests to Ollama (seconds, min 30).
+# CRITICAL: Ollama CANCELS a load when the client disconnects (verified
+# 2026-08-16). Too low a value silently throws away minutes of work.
+# Measured: 28 GB model = 303 s cold (ZFS pool) / 127 s warm (ARC).
+# Default 1800 leaves headroom for the largest models on a cold cache.
+# MODEL_ACTION_TIMEOUT_SEC=1800
 ```
 
 - [ ] **Step 2: Write the Ollama action client**
@@ -478,7 +480,7 @@ function ghostLabel(startedAt) {
   const s = Math.floor((Date.now() - startedAt) / 1000);
   const t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   return (Date.now() - startedAt) >= PENDING_WARN_MS
-    ? `loading ${t} — check Ollama logs`
+    ? `loading ${t} — still waiting`
     : `loading… ${t}`;
 }
 
@@ -513,16 +515,12 @@ async function doModelAction(kind, name) {
       ? 'Load requested — watching for it to appear.'
       : `Unloaded ${name}`;
   } catch (e) {
-    // A slow failure is almost always a timeout, and a timeout does NOT
-    // cancel the load on Ollama's side — reporting failure would be a lie.
-    const slow = kind === 'load' && pendingLoad &&
-                 Date.now() - pendingLoad.startedAt > 30_000;
-    if (slow) {
-      msg.textContent = 'Connection timed out — the load continues, still watching.';
-    } else {
-      if (kind === 'load') clearPending();
-      msg.textContent = 'Error: ' + e.message;
-    }
+    // Any failure is a real failure: Ollama cancels an in-progress load when
+    // the client disconnects, so a timeout means the work was thrown away.
+    if (kind === 'load') clearPending();
+    msg.textContent = /timeout/i.test(e.message)
+      ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
+      : 'Error: ' + e.message;
   }
   setTimeout(() => { msg.textContent = ''; }, 15000);
   pollAll();
@@ -943,56 +941,42 @@ git commit -m "fix: <what the verification uncovered>"
 - Modify: `README.md`
 - Possibly modify: `public/app.js` (Expires column)
 
-- [ ] **Step 1: Confirm `OLLAMA_KEEP_ALIVE`**
+- [x] **Step 1: Confirm `OLLAMA_KEEP_ALIVE`** — done 2026-08-16 during Task 2.
+`/api/ps` reports `expires_at` in the year 2318, which is how Ollama encodes an infinite
+`keep_alive`. No SSH needed. Recorded in the spec.
+
+- [x] **Step 2: Determine when `/api/ps` lists a loading model** — done 2026-08-16.
+Polled every 3 s across a 303 s load: the list stayed empty the whole time and the model
+appeared only once fully resident. No `size_vram > 0` guard needed. Recorded in the spec.
+
+- [ ] **Step 3: Confirm the reverse proxy situation — BLOCKING for deployment**
+
+Ollama cancels a load when the client disconnects, so anything between the browser and the
+container must tolerate a request lasting up to ~10 minutes. On the Dockge host:
 
 ```bash
-ssh <LLM_USER>@<LLM_HOST> 'midclt call app.query | grep -o "OLLAMA_KEEP_ALIVE[^,]*"'
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep -Ei 'nginx|traefik|caddy|cloudflared'
+ss -tlnp | grep -E '3788|:80|:443'
 ```
 
-Replace the *Verification item* block in the spec's "Why this matters here"
-section with the confirmed value and the date. If it is **not** `-1`, stop and
-report — several decisions in the spec rest on that assumption.
-
-- [ ] **Step 2: Determine when `/api/ps` lists a loading model**
-
-Start a load of a large model and poll in a second terminal:
-
-```bash
-while true; do
-  date +%T
-  curl -s http://<LLM_HOST>:11434/api/ps | head -c 200
-  echo
-  sleep 2
-done
-```
-
-Record whether the model appears only when fully resident, or earlier with a
-growing `size_vram`. Replace the *Verification item* under "Completion
-detection" with the finding.
-
-**If it appears early:** appearance alone is a premature success signal. Change
-the condition in `renderOllama` from `models.some(m => m.name === …)` to also
-require `m.sizeVram > 0`, and note the change in the spec.
-
-- [ ] **Step 3: Record the measured load time and the proxy answer**
-
-Put the `time curl` result from Task 2 Step 5 into the spec's Timeouts section
-as the justification for the 300 s default. Answer the *Open question* about a
-reverse proxy (direct port 3788, or through Nginx/Traefik/Cloudflare) and
-record it.
+If a proxy is in the path, raise its read timeout (`proxy_read_timeout 1800s` in Nginx,
+`forwardingTimeouts.responseHeaderTimeout` in Traefik) — no application setting can
+compensate. Record the finding in the spec's Timeouts section. Local development connects
+directly, so this cannot surface in dev.
 
 - [ ] **Step 4: Decide the Expires column**
 
-Check what `/api/ps` returns for `expires_at` under the confirmed `keep_alive`
-setting. If the value is meaningless (a far-future date), render `∞` instead:
+Measured 2026-08-16: under `keep_alive: -1` Ollama returns `expires_at` in the **year 2318**,
+not a sentinel far enough out for a naive year threshold. Use a horizon test instead:
 
 ```js
-const expires = !m.expiresAt ? '—'
-  : new Date(m.expiresAt).getFullYear() > 9000 ? '∞'
-  : new Date(m.expiresAt).toLocaleTimeString();
+const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
+const expires = !expiresMs ? '—'
+  : expiresMs - Date.now() > 86_400_000 ? '∞'
+  : new Date(expiresMs).toLocaleTimeString();
 ```
 
-Adjust the year threshold to whatever Ollama actually returns. If the value is
+Anything more than a day out is effectively never. If the value is
 sensible, leave the column untouched and delete the *Incidental Cleanup*
 section from the spec.
 
