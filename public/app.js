@@ -55,6 +55,91 @@ function ghostLabel(startedAt) {
 
 pendingLoad = readPending();
 
+// ── Model browser modal ──────────────────────────────────────────────
+let availableModels = [];
+let modelsFilter = '';
+
+async function refreshAvailableModels() {
+  const msg = document.getElementById('models-msg');
+  try {
+    const data = await apiFetch('/api/models');
+    if (data.error) throw new Error(data.error);
+    availableModels = data.models || [];
+    msg.textContent = '';
+  } catch (e) {
+    availableModels = [];
+    msg.textContent = 'Could not load model list: ' + e.message;
+  }
+  if (modelsModalOpen) renderModelsModal();
+}
+
+function openModelsModal() {
+  modelsModalOpen = true;
+  renderModelsModal();
+  document.getElementById('models-modal').style.display = 'flex';
+  document.getElementById('models-filter').focus();
+}
+
+function closeModelsModal() {
+  modelsModalOpen = false;
+  document.getElementById('models-modal').style.display = 'none';
+}
+
+function renderModelsModal() {
+  const sub = document.getElementById('models-modal-sub');
+  const body = document.getElementById('models-modal-body');
+  body.textContent = '';
+
+  // Residency comes from the latest /api/ps snapshot, never from our own
+  // actions — an external client can load or evict at any moment.
+  const resident = new Set(lastLoadedModels.map(m => m.name));
+  const q = modelsFilter.trim().toLowerCase();
+  const rows = availableModels.filter(m => !q || m.name.toLowerCase().includes(q));
+
+  sub.textContent = `${availableModels.length} installed · ${resident.size} in memory`;
+
+  if (!availableModels.length) {
+    body.appendChild(el('span', 'dim-text', 'No models found — press ↻ to retry'));
+    return;
+  }
+  if (!rows.length) {
+    body.appendChild(el('span', 'dim-text', 'No model matches the filter'));
+    return;
+  }
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Model', 'Size', 'Params', 'Quant', ''].forEach(h => hr.appendChild(el('th', null, h)));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const m of rows) {
+    const isResident = resident.has(m.name);
+    const isPending = pendingLoad?.model === m.name;
+    const tr = el('tr', isResident ? 'row-resident' : null);
+
+    [['td-model', m.name], ['td-mono', gb(m.sizeBytes) + ' GB'],
+     ['td-mono', m.parameterSize], ['td-mono', m.quantization]]
+      .forEach(([cls, val]) => tr.appendChild(el('td', cls, val)));
+
+    const tdAct = el('td', 'td-actions');
+    const btn = el('button', 'btn-small',
+      isPending ? 'Loading…' : isResident ? 'Unload' : 'Load');
+    btn.disabled = isPending;
+    if (!isPending) {
+      btn.addEventListener('click',
+        () => doModelAction(isResident ? 'unload' : 'load', m.name));
+    }
+    tdAct.appendChild(btn);
+    tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  body.appendChild(table);
+}
+
 // ── API ───────────────────────────────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
@@ -111,9 +196,11 @@ fetch('/api/config').then(r => r.json()).then(c => {
   const intervalMs = ((c.pollIntervalSec || 5) * 1000);
   setInterval(pollAll, intervalMs);
   pollAll();
+  refreshAvailableModels();
 }).catch(() => {
   setInterval(pollAll, 5000);
   pollAll();
+  refreshAvailableModels();
 });
 
 // ── Status ────────────────────────────────────────────────────────────
@@ -322,7 +409,19 @@ document.getElementById('gpu-modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeGpuModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && gpuModalBusId) closeGpuModal();
+  if (e.key !== 'Escape') return;
+  if (gpuModalBusId) closeGpuModal();
+  if (modelsModalOpen) closeModelsModal();
+});
+
+document.getElementById('models-modal-close').addEventListener('click', closeModelsModal);
+document.getElementById('models-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModelsModal();
+});
+document.getElementById('models-refresh').addEventListener('click', refreshAvailableModels);
+document.getElementById('models-filter').addEventListener('input', (e) => {
+  modelsFilter = e.target.value;
+  renderModelsModal();
 });
 
 function renderGpuModal() {
