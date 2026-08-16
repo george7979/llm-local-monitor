@@ -972,7 +972,7 @@ not a sentinel far enough out for a naive year threshold. A horizon test is used
 ```js
 const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
 const expires = !expiresMs ? '—'
-  : expiresMs - Date.now() > 86_400_000 ? '∞'
+  : expiresMs - Date.now() > 86_400_000 ? 'never'   // ∞ vanishes at this font size
   : new Date(expiresMs).toLocaleTimeString();
 ```
 

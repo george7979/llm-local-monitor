@@ -296,8 +296,10 @@ function renderOllama(data) {
     const tr = document.createElement('tr');
     // keep_alive:-1 lands ~300 years out; anything past a day is effectively never
     const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
+    // "never" rather than ∞ — the glyph has no ascenders and disappears at
+    // this font size, reading as an empty cell.
     const expires = !expiresMs ? '—'
-      : expiresMs - Date.now() > 86_400_000 ? '∞'
+      : expiresMs - Date.now() > 86_400_000 ? 'never'
       : new Date(expiresMs).toLocaleTimeString();
     const vram    = m.sizeVram  ? gb(m.sizeVram) + ' GB' : '—';
     const ctx     = m.contextLength ? Math.round(m.contextLength / 1000) + 'k' : '—';

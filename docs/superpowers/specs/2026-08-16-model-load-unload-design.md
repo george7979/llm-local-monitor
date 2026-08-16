@@ -382,4 +382,4 @@ time curl -s http://<host>:11434/api/generate \
 
 The **Expires** column (`public/app.js:139`) renders `expires_at` as a local time. Under
 `keep_alive: -1` that value is meaningless. Check what `/api/ps` actually returns and either
-display `∞` or leave it unchanged — a small fix, not a reason to expand scope.
+display `never` or leave it unchanged — a small fix, not a reason to expand scope.
