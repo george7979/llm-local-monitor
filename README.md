@@ -43,15 +43,20 @@ the full picture.
 
 ## Managing what sits in VRAM
 
-The **Loaded models** panel is no longer read-only.
+The **Loaded models** panel both reports residency and changes it.
 
-- **Unload** next to any resident model frees its VRAM without touching the others. Until now
-  the only option was *Restart Ollama*, which drops everything.
+- **Unload** next to any resident model frees its VRAM without touching the others — a precise
+  alternative to *Restart Ollama*, which drops everything at once.
 - **Models…** opens the catalog of everything installed on the server, with a name filter and
   a **Load** button per model. Models already in memory are marked and offer *Unload* there
   too, so making room and loading something else takes one visit.
 - The catalog is fetched once per page load; press **↻** after an `ollama pull` or `rm` on the
   host.
+- Changes made elsewhere show up on their own: load a model from Open WebUI and the panel and
+  the markers follow within one polling cycle.
+- Embedding models (`embeddinggemma`, `nomic-embed-*`) can be unloaded but not loaded from
+  here — Ollama has no way to warm them without an actual embedding request, and the clients
+  that use them load them on demand anyway.
 
 A load can run for minutes — a 28 GB model takes about 5 minutes from cold storage. The
 dashboard shows a placeholder row with a running counter and keeps polling; the model appears
