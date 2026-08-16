@@ -144,7 +144,13 @@ function renderModelsModal() {
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    // Error responses carry {error: "..."} — surface that, not the raw JSON.
+    const text = await res.text();
+    let message = text;
+    try { message = JSON.parse(text).error || text; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
   return res.json();
 }
 

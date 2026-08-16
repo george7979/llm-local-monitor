@@ -310,6 +310,7 @@ this design deliberately rejects.
 | Condition | Backend | UI |
 |-----------|---------|-----|
 | Model not in `/api/tags` | `400 Unknown model` | `No such model` |
+| Load of an embedding-only model | `500` with a plain-language message | `<name> is an embedding model — clients load it on demand, it cannot be warmed from here`. Verified 2026-08-16: `/api/generate` rejects these outright, but **unloading them works**, because the `keep_alive: 0` path returns before the capability check. Warming them from the dashboard has no value anyway — they are small and the clients that need them load them on demand |
 | Ollama unreachable | `500` + message | error text, ghost row dropped |
 | Load exceeds timeout | `500` timeout | shown as failure — Ollama cancelled the load, it must be retried |
 | VRAM pressure | Ollama evicts other resident models to fit | card shows the eviction within one poll cycle — expected behaviour, not an app error |
