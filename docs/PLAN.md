@@ -133,6 +133,8 @@ Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
 
 ## v2 Backlog (after v1 stabilization)
 
+- [ ] Refresh `pics/dashboard-eng-7.png` — predates v1.4.0, so it shows the LOADED MODELS card without the Unload column or the Models… button (README embeds it at the top)
+
 - [ ] SQLite: per-minute GPU/memory samples, 7-day retention
 - [ ] Sparkline charts in UI (GPU%, VRAM, temp history)
 - [ ] Alerts: notify when GPU temp > 85°C or VRAM > 90%
