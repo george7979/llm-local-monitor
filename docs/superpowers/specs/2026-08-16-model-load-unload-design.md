@@ -176,10 +176,22 @@ to a warm-cache measurement. At the observed ~92 MB/s, the largest installed mod
 (`qwen3-coder-next`, 48 GB) needs roughly 9 minutes cold. The 1800 s default leaves headroom;
 the env var exists so it can be raised without rebuilding the image.
 
-> **Blocking question:** is the deployed dashboard reached directly on port 3788, or through a
-> reverse proxy (Nginx / Traefik / Cloudflare Tunnel)? A proxy with the usual 60 s
-> `proxy_read_timeout` will kill every load of a large model, and no application-side setting
-> can compensate. Local development connects directly, so this cannot be caught in dev.
+**Reverse proxies: resolved 2026-08-16.** The deployment is reached through Nginx at
+`https://ollama-monitor.techgraft.net`, and a load exceeding `proxy_read_timeout` was tested
+there. **The model still loaded.** The request chain has two independent legs:
+
+```
+browser ──①── nginx ──②── container ──③── Ollama
+```
+
+Nginx's timeout severs leg ②. Leg ③ — the `undici` request that Ollama actually cares about —
+is untouched, because Express does not propagate a client disconnect to outgoing requests.
+Only leg ③ expiring makes Ollama cancel.
+
+A proxy timeout is therefore a **feedback problem, not an operational one**: the load
+completes, but the browser is told nothing. Raising `proxy_read_timeout` to 1800 s is still
+recommended so the UI reports honestly; the frontend meanwhile treats 502/504 as "still
+watching" rather than as failure.
 
 ### Routes (`src/routes.js`)
 
@@ -249,7 +261,8 @@ separate parameterised function sits alongside it, sharing only `apiFetch`.
 |--------|---------|-------------|
 | Model appears in `/api/ps` | **Loaded** — the only reliable success signal | ghost row → real row; modal button → Unload |
 | Fast HTTP error (404 / 500) | Real failure: unknown model, Ollama down | show error, drop ghost row |
-| Timeout / dropped connection | **Failure** — Ollama cancelled the load | drop ghost row, report that the load was aborted and must be retried |
+| `500` timeout from our own request | **Failure** — Ollama cancelled the load | drop ghost row, report that the load was aborted and must be retried |
+| `502` / `504` from a proxy | **Not a failure** — a different leg was severed; the load continues | keep the ghost row, say the proxy stopped waiting and we are still watching |
 | Nothing after 10 min, connection still open | Load is slow but alive | ghost row shows `loading 10:00 — still waiting`; row remains |
 
 **Verified 2026-08-16:** `/api/ps` returns an empty list for the entire duration of a load and

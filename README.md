@@ -58,9 +58,10 @@ dashboard shows a placeholder row with a running counter and keeps polling; the 
 as a normal row the moment Ollama reports it resident. Reloading the page mid-load is safe, and
 the counter picks up where it was.
 
-> **Deploying behind a reverse proxy?** Raise its read timeout to at least 1800 s. Ollama
-> cancels a load if the client disconnects, so a proxy timing out at the usual 60 s makes large
-> models impossible to load.
+> **Deploying behind a reverse proxy?** Raise its read timeout to at least 1800 s
+> (`proxy_read_timeout 1800s;` in Nginx). Loads still complete without it — the proxy only
+> severs the browser-to-container leg, not the one Ollama sees — but the dashboard loses sight
+> of the request and can only report that it stopped waiting.
 
 ## Panels
 

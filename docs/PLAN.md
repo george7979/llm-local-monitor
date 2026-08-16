@@ -120,8 +120,9 @@ Spec: `docs/superpowers/specs/2026-07-04-gpu-process-modal-design.md`
 | 4 | Model browser modal: catalog, filter, manual ↻, residency markers | ✅ Done |
 | 5 | End-to-end verification in browser (load, F5 mid-load, failure paths, external changes) | ✅ Done |
 | 6 | Documentation | ✅ Done |
-| 7 | **Reverse proxy check on the Dockge host** — loads run for minutes and Ollama cancels on client disconnect | ⛔ Blocking deployment |
-| 8 | User acceptance test on target server (Dockge) | ⬜ To do |
+| 7 | Reverse proxy check — Nginx at `ollama-monitor.techgraft.net`; a 504 does **not** cancel the load, only the UI feedback. 502/504 now handled as "still watching" | ✅ Done |
+| 8 | Raise `proxy_read_timeout` to 1800 s in Nginx (cosmetic, not required) | ⬜ To do |
+| 9 | User acceptance test on target server (Dockge) | 🚧 In progress |
 
 Spec: `docs/superpowers/specs/2026-08-16-model-load-unload-design.md`
 Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`

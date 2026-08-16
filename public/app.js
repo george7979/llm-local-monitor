@@ -145,11 +145,14 @@ function renderModelsModal() {
 async function apiFetch(path, opts = {}) {
   const res = await fetch(path, opts);
   if (!res.ok) {
-    // Error responses carry {error: "..."} — surface that, not the raw JSON.
+    // Our own errors carry {error: "..."}; a proxy in the path answers with an
+    // HTML page instead, which must never be dumped into the UI.
     const text = await res.text();
-    let message = text;
-    try { message = JSON.parse(text).error || text; } catch { /* not JSON */ }
-    throw new Error(message);
+    let message;
+    try { message = JSON.parse(text).error || text; } catch { message = `HTTP ${res.status}`; }
+    const err = new Error(message);
+    err.status = res.status;   // callers distinguish proxy timeouts from ours
+    throw err;
   }
   return res.json();
 }
@@ -866,12 +869,19 @@ async function doModelAction(kind, name) {
       ? 'Load requested — watching for it to appear.'
       : `Unloaded ${name}`;
   } catch (e) {
-    // Any failure is a real failure: Ollama cancels an in-progress load when
-    // the client disconnects, so a timeout means the work was thrown away.
-    if (kind === 'load') clearPending();
-    msg.textContent = /timeout/i.test(e.message)
-      ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
-      : 'Error: ' + e.message;
+    // 502/504 come from a proxy between the browser and the container. That
+    // leg is separate from the container→Ollama request, which is untouched
+    // and still loading — so this is not a failure and the ghost row stays.
+    // Our own timeout arrives as 500 and DOES mean Ollama cancelled the load.
+    const proxyGaveUp = e.status === 502 || e.status === 504;
+    if (kind === 'load' && proxyGaveUp) {
+      msg.textContent = 'The proxy stopped waiting — the load continues, still watching.';
+    } else {
+      if (kind === 'load') clearPending();
+      msg.textContent = /timeout/i.test(e.message)
+        ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
+        : 'Error: ' + e.message;
+    }
   }
   // Redraw unconditionally: pollAll() swallows its own errors, so relying on
   // it to clear the ghost row leaves it stranded exactly when the backend is
