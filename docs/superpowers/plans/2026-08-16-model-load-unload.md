@@ -949,19 +949,25 @@ git commit -m "fix: <what the verification uncovered>"
 Polled every 3 s across a 303 s load: the list stayed empty the whole time and the model
 appeared only once fully resident. No `size_vram > 0` guard needed. Recorded in the spec.
 
-- [ ] **Step 3: Confirm the reverse proxy situation — BLOCKING for deployment**
+- [x] **Step 3: Confirm the reverse proxy situation** — done 2026-08-16, and the concern turned
+out to be overstated.
 
-Ollama cancels a load when the client disconnects, so anything between the browser and the
-container must tolerate a request lasting up to ~10 minutes. On the Dockge host:
+The deployment sits behind Nginx at `https://ollama-monitor.techgraft.net`. A load exceeding
+`proxy_read_timeout` was tested there and **the model still loaded**: Nginx severs the
+browser↔container leg, while the container↔Ollama request — the one Ollama cancels on — is
+untouched. A proxy timeout costs feedback, not work, and the frontend now reports 502/504 as
+"still watching" rather than as failure.
+
+Raising the timeout remains recommended for honest feedback. On the Dockge host:
 
 ```bash
 docker ps --format '{{.Names}}\t{{.Ports}}' | grep -Ei 'nginx|traefik|caddy|cloudflared'
 ss -tlnp | grep -E '3788|:80|:443'
 ```
 
-If a proxy is in the path, raise its read timeout (`proxy_read_timeout 1800s` in Nginx,
+Raise the read timeout (`proxy_read_timeout 1800s` in Nginx,
 `forwardingTimeouts.responseHeaderTimeout` in Traefik) — no application setting can
-compensate. Record the finding in the spec's Timeouts section. Local development connects
+compensate. Recorded in the spec's Timeouts section. Local development connects
 directly, so this cannot surface in dev.
 
 - [x] **Step 4: Decide the Expires column** — implemented in Task 3.
