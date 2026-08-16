@@ -1,7 +1,7 @@
 # Design Spec: Model Load / Unload (manage VRAM residency from the dashboard)
 
 **Date:** 2026-08-16
-**Status:** Draft — awaiting review
+**Status:** Implemented — released as v1.4.0 (2026-08-17)
 
 ---
 
