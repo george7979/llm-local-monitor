@@ -841,7 +841,12 @@ async function doModelAction(kind, name) {
 
   const msg = document.getElementById(modelsModalOpen ? 'models-msg' : 'models-card-msg');
 
-  if (kind === 'load') setPending(name);
+  if (kind === 'load') {
+    setPending(name);
+    // Redraw the card now instead of waiting up to a full poll interval —
+    // otherwise closing the modal right after clicking shows no feedback.
+    renderOllama({ models: lastLoadedModels });
+  }
   if (modelsModalOpen) renderModelsModal();
   msg.textContent = kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`;
 
@@ -862,6 +867,11 @@ async function doModelAction(kind, name) {
       ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
       : 'Error: ' + e.message;
   }
+  // Redraw unconditionally: pollAll() swallows its own errors, so relying on
+  // it to clear the ghost row leaves it stranded exactly when the backend is
+  // the thing that failed.
+  renderOllama({ models: lastLoadedModels });
+  if (modelsModalOpen) renderModelsModal();
   setTimeout(() => { msg.textContent = ''; }, 15000);
   pollAll();
 }
