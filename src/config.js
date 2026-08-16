@@ -29,4 +29,5 @@ export const cfg = {
   wakeCmd: process.env.WAKE_CMD || null,
   sleepCmd: process.env.SLEEP_CMD || null,
   pollIntervalSec: Math.max(1, parseInt(process.env.POLL_INTERVAL_SEC, 10) || 5),
+  modelActionTimeoutSec: Math.max(30, parseInt(process.env.MODEL_ACTION_TIMEOUT_SEC, 10) || 1800),
 };

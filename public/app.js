@@ -12,11 +12,148 @@ function el(tag, cls, text) {
 let gpuModalBusId = null;
 let lastGpuSnapshot = { gpu: null, procs: null };
 
+// ── Model state ──────────────────────────────────────────────────────
+const PENDING_KEY = 'pendingModelLoad';
+const PENDING_MAX_MS = 15 * 60 * 1000;   // drop a stale marker after 15 min
+const PENDING_WARN_MS = 10 * 60 * 1000;  // 10 min: say it is taking unusually long
+
+let pendingLoad = null;       // { model, startedAt } — cosmetic only
+let lastLoadedModels = [];    // latest /api/ps snapshot, for the modal markers
+let modelsModalOpen = false;  // declared here, used by the model browser modal
+
+function readPending() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p?.model || !p?.startedAt) throw new Error('malformed');
+    if (Date.now() - p.startedAt > PENDING_MAX_MS) throw new Error('stale');
+    return p;
+  } catch {
+    localStorage.removeItem(PENDING_KEY);
+    return null;
+  }
+}
+
+function setPending(model) {
+  pendingLoad = { model, startedAt: Date.now() };
+  localStorage.setItem(PENDING_KEY, JSON.stringify(pendingLoad));
+}
+
+function clearPending() {
+  pendingLoad = null;
+  localStorage.removeItem(PENDING_KEY);
+}
+
+function ghostLabel(startedAt) {
+  const s = Math.floor((Date.now() - startedAt) / 1000);
+  const t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return (Date.now() - startedAt) >= PENDING_WARN_MS
+    ? `loading ${t} — still waiting`
+    : `loading… ${t}`;
+}
+
+pendingLoad = readPending();
+
+// ── Model browser modal ──────────────────────────────────────────────
+let availableModels = [];
+let modelsFilter = '';
+
+async function refreshAvailableModels() {
+  const msg = document.getElementById('models-msg');
+  try {
+    const data = await apiFetch('/api/models');
+    if (data.error) throw new Error(data.error);
+    availableModels = data.models || [];
+    msg.textContent = '';
+  } catch (e) {
+    availableModels = [];
+    msg.textContent = 'Could not load model list: ' + e.message;
+  }
+  if (modelsModalOpen) renderModelsModal();
+}
+
+function openModelsModal() {
+  modelsModalOpen = true;
+  renderModelsModal();
+  document.getElementById('models-modal').style.display = 'flex';
+  document.getElementById('models-filter').focus();
+}
+
+function closeModelsModal() {
+  modelsModalOpen = false;
+  document.getElementById('models-modal').style.display = 'none';
+}
+
+function renderModelsModal() {
+  const sub = document.getElementById('models-modal-sub');
+  const body = document.getElementById('models-modal-body');
+  body.textContent = '';
+
+  // Residency comes from the latest /api/ps snapshot, never from our own
+  // actions — an external client can load or evict at any moment.
+  const resident = new Set(lastLoadedModels.map(m => m.name));
+  const q = modelsFilter.trim().toLowerCase();
+  const rows = availableModels.filter(m => !q || m.name.toLowerCase().includes(q));
+
+  sub.textContent = `${availableModels.length} installed · ${resident.size} in memory`;
+
+  if (!availableModels.length) {
+    body.appendChild(el('span', 'dim-text', 'No models found — press ↻ to retry'));
+    return;
+  }
+  if (!rows.length) {
+    body.appendChild(el('span', 'dim-text', 'No model matches the filter'));
+    return;
+  }
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Model', 'Size', 'Params', 'Quant', ''].forEach(h => hr.appendChild(el('th', null, h)));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const m of rows) {
+    const isResident = resident.has(m.name);
+    const isPending = pendingLoad?.model === m.name;
+    const tr = el('tr', isResident ? 'row-resident' : null);
+
+    [['td-model', m.name], ['td-mono', gb(m.sizeBytes) + ' GB'],
+     ['td-mono', m.parameterSize], ['td-mono', m.quantization]]
+      .forEach(([cls, val]) => tr.appendChild(el('td', cls, val)));
+
+    const tdAct = el('td', 'td-actions');
+    const btn = el('button', 'btn-small',
+      isPending ? 'Loading…' : isResident ? 'Unload' : 'Load');
+    btn.disabled = isPending;
+    if (!isPending) {
+      btn.addEventListener('click',
+        () => doModelAction(isResident ? 'unload' : 'load', m.name));
+    }
+    tdAct.appendChild(btn);
+    tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  body.appendChild(table);
+}
+
 // ── API ───────────────────────────────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    // Our own errors carry {error: "..."}; a proxy in the path answers with an
+    // HTML page instead, which must never be dumped into the UI.
+    const text = await res.text();
+    let message;
+    try { message = JSON.parse(text).error || text; } catch { message = `HTTP ${res.status}`; }
+    const err = new Error(message);
+    err.status = res.status;   // callers distinguish proxy timeouts from ours
+    throw err;
+  }
   return res.json();
 }
 
@@ -37,6 +174,8 @@ async function pollAll() {
     const data = await apiFetch('/api/status');
     renderStatus(data.host, data.ipmi, data.ollamaApp);
     renderOllama(data.ollama);
+    lastLoadedModels = data.ollama?.models || [];
+    if (modelsModalOpen) renderModelsModal();
     renderOllamaApp(data.ollamaApp);
     renderGpu(data.gpu);
     lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
@@ -66,9 +205,11 @@ fetch('/api/config').then(r => r.json()).then(c => {
   const intervalMs = ((c.pollIntervalSec || 5) * 1000);
   setInterval(pollAll, intervalMs);
   pollAll();
+  refreshAvailableModels();
 }).catch(() => {
   setInterval(pollAll, 5000);
   pollAll();
+  refreshAvailableModels();
 });
 
 // ── Status ────────────────────────────────────────────────────────────
@@ -117,9 +258,16 @@ function renderOllama(data) {
   const wrap = document.getElementById('ollama-content');
   wrap.textContent = '';
 
+  const models = data && !data.error ? (data.models || []) : null;
+
+  // /api/ps is authoritative: the model showing up IS the success signal.
+  if (models && pendingLoad && models.some(m => m.name === pendingLoad.model)) {
+    clearPending();
+  }
+
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
-  if (!data.models?.length) {
+  if (!models.length && !pendingLoad) {
     wrap.appendChild(el('span', 'dim-text', 'No models loaded'));
     return;
   }
@@ -127,16 +275,32 @@ function renderOllama(data) {
   const table = document.createElement('table');
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
-  ['Model', 'Params', 'Quant', 'Processor', 'VRAM', 'Ctx', 'Expires'].forEach(h => {
+  ['Model', 'Params', 'Quant', 'Processor', 'VRAM', 'Ctx', 'Expires', ''].forEach(h => {
     hr.appendChild(el('th', null, h));
   });
   thead.appendChild(hr);
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  for (const m of data.models) {
+
+  if (pendingLoad) {
+    const tr = el('tr', 'ghost-row');
+    tr.appendChild(el('td', 'td-model', pendingLoad.model));
+    const tdMsg = el('td', 'dim-text', ghostLabel(pendingLoad.startedAt));
+    tdMsg.colSpan = 7;
+    tr.appendChild(tdMsg);
+    tbody.appendChild(tr);
+  }
+
+  for (const m of models) {
     const tr = document.createElement('tr');
-    const expires = m.expiresAt ? new Date(m.expiresAt).toLocaleTimeString() : '—';
+    // keep_alive:-1 lands ~300 years out; anything past a day is effectively never
+    const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
+    // "never" rather than ∞ — the glyph has no ascenders and disappears at
+    // this font size, reading as an empty cell.
+    const expires = !expiresMs ? '—'
+      : expiresMs - Date.now() > 86_400_000 ? 'never'
+      : new Date(expiresMs).toLocaleTimeString();
     const vram    = m.sizeVram  ? gb(m.sizeVram) + ' GB' : '—';
     const ctx     = m.contextLength ? Math.round(m.contextLength / 1000) + 'k' : '—';
 
@@ -161,6 +325,13 @@ function renderOllama(data) {
       if (title) td.title = title;
       tr.appendChild(td);
     });
+
+    const tdAct = el('td', 'td-actions');
+    const btn = el('button', 'btn-small', 'Unload');
+    btn.addEventListener('click', () => doModelAction('unload', m.name));
+    tdAct.appendChild(btn);
+    tr.appendChild(tdAct);
+
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
@@ -249,7 +420,19 @@ document.getElementById('gpu-modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeGpuModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && gpuModalBusId) closeGpuModal();
+  if (e.key !== 'Escape') return;
+  if (gpuModalBusId) closeGpuModal();
+  if (modelsModalOpen) closeModelsModal();
+});
+
+document.getElementById('models-modal-close').addEventListener('click', closeModelsModal);
+document.getElementById('models-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModelsModal();
+});
+document.getElementById('models-refresh').addEventListener('click', refreshAvailableModels);
+document.getElementById('models-filter').addEventListener('input', (e) => {
+  modelsFilter = e.target.value;
+  renderModelsModal();
 });
 
 function renderGpuModal() {
@@ -657,6 +840,58 @@ async function upgradeOllamaApp(msgId = 'ollama-upgrade-msg') {
     msg.textContent = 'Error: ' + e.message;
   }
   setTimeout(() => { msg.textContent = ''; }, 15000);
+}
+
+// Kept separate from action() below: that one is name-keyed with hardcoded
+// message maps and takes no arguments; these are parameterised by model name.
+async function doModelAction(kind, name) {
+  if (kind === 'unload' &&
+      !confirm(`Unload ${name}?\nVRAM is freed immediately; reloading can take minutes.`)) {
+    return;
+  }
+
+  const msg = document.getElementById(modelsModalOpen ? 'models-msg' : 'models-card-msg');
+
+  if (kind === 'load') {
+    setPending(name);
+    // Redraw the card now instead of waiting up to a full poll interval —
+    // otherwise closing the modal right after clicking shows no feedback.
+    renderOllama({ models: lastLoadedModels });
+  }
+  if (modelsModalOpen) renderModelsModal();
+  msg.textContent = kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`;
+
+  try {
+    await apiFetch(`/api/${kind}-model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name }),
+    });
+    msg.textContent = kind === 'load'
+      ? 'Load requested — watching for it to appear.'
+      : `Unloaded ${name}`;
+  } catch (e) {
+    // 502/504 come from a proxy between the browser and the container. That
+    // leg is separate from the container→Ollama request, which is untouched
+    // and still loading — so this is not a failure and the ghost row stays.
+    // Our own timeout arrives as 500 and DOES mean Ollama cancelled the load.
+    const proxyGaveUp = e.status === 502 || e.status === 504;
+    if (kind === 'load' && proxyGaveUp) {
+      msg.textContent = 'The proxy stopped waiting — the load continues, still watching.';
+    } else {
+      if (kind === 'load') clearPending();
+      msg.textContent = /timeout/i.test(e.message)
+        ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
+        : 'Error: ' + e.message;
+    }
+  }
+  // Redraw unconditionally: pollAll() swallows its own errors, so relying on
+  // it to clear the ghost row leaves it stranded exactly when the backend is
+  // the thing that failed.
+  renderOllama({ models: lastLoadedModels });
+  if (modelsModalOpen) renderModelsModal();
+  setTimeout(() => { msg.textContent = ''; }, 15000);
+  pollAll();
 }
 
 async function action(name) {

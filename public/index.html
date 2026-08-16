@@ -88,8 +88,12 @@
   </div>
 
   <div class="card" id="card-ollama">
-    <div class="card-label">LOADED MODELS</div>
+    <div class="card-label-row">
+      <div class="card-label">LOADED MODELS</div>
+      <button id="btn-models" class="btn-small" onclick="openModelsModal()">Models&hellip;</button>
+    </div>
     <div id="ollama-content"><span class="dim-text">Loading...</span></div>
+    <div class="action-msg" id="models-card-msg"></div>
   </div>
 
   <div class="card" id="card-gpu">
@@ -110,6 +114,24 @@
       <button class="modal-close" id="gpu-modal-close" aria-label="Close">&#10005;</button>
     </div>
     <div id="gpu-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="models-modal" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="models-modal-title">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="models-modal-title">Available models</div>
+        <div class="modal-sub" id="models-modal-sub"></div>
+      </div>
+      <button class="modal-close" id="models-modal-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="models-tools">
+      <input type="text" id="models-filter" placeholder="Filter by name&hellip;" autocomplete="off">
+      <button id="models-refresh" class="btn-small" title="Reload the list from the server">&#8635;</button>
+    </div>
+    <div class="action-msg" id="models-msg"></div>
+    <div id="models-modal-body"></div>
   </div>
 </div>
 

@@ -638,3 +638,26 @@ button.modal-close:hover { color: var(--text); background: none; }
   background: rgba(240,68,56,.08);
   border-color: rgba(240,68,56,.4);
 }
+
+/* ── Model actions ─────────────────────────────────────────────────── */
+.btn-small {
+  width: auto;                 /* base `button` is width:100% */
+  padding: 3px 10px;
+  font-size: 12px;
+  justify-content: center;
+}
+tr.ghost-row td { opacity: .55; font-style: italic; }
+td.td-actions { text-align: right; white-space: nowrap; padding-right: 0; }
+td.td-actions button { display: inline-flex; }
+.models-tools { display: flex; gap: 8px; margin-bottom: 8px; }
+.models-tools input {
+  flex: 1; padding: 4px 8px;
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: var(--r-sm); color: var(--text);
+  font-family: var(--mono); font-size: 12px;
+}
+.models-tools input:focus { outline: none; border-color: var(--accent); }
+.models-tools .btn-small { flex: 0 0 auto; }
+tr.row-resident td.td-model::after {
+  content: ' • in memory'; opacity: .6; font-size: 11px;
+}

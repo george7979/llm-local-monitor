@@ -16,10 +16,13 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive
   ├── GET /api/gpu-procs       → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
   ├── GET /api/check-update    → GitHub API (cached 1h server-side)
+  ├── GET /api/models          → Ollama REST :11434/api/tags (installed on disk)
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
   ├── POST /api/restart-ollama → SSH → midclt call app.stop/start
-  └── POST /api/upgrade-ollama → SSH → midclt call app.upgrade
+  ├── POST /api/upgrade-ollama → SSH → midclt call app.upgrade
+  ├── POST /api/load-model     → Ollama REST /api/generate, keep_alive:-1
+  └── POST /api/unload-model   → Ollama REST /api/generate, keep_alive:0
         ↓ SSH (ed25519, decoded from SSH_PRIVATE_KEY_B64)
   $LLM_HOST ($LLM_USER)
   ↓ TCP probe :443
@@ -41,6 +44,12 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
 | Upgrade Ollama UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeOllamaApp(msgId)` routes feedback to the calling card |
 | GPU process names | PID → `/proc/<pid>/cgroup` → `midclt call app.query` on host | nvidia-smi reports only binary paths; TrueNAS app name (e.g. `ollama`) is the meaningful label; `docker ps` not accessible to `truenas_admin`; single SSH round-trip keeps it atomic |
+| Load / unload models | `POST /api/generate` with `keep_alive: -1` / `0`, `stream: false` | Ollama has no dedicated load/unload endpoints. `stream: false` keeps the whole operation inside one response, so a single timeout governs it |
+| Model-action timeout | Own `undici.Agent`, `MODEL_ACTION_TIMEOUT_SEC` (default 1800) | **Ollama cancels an in-progress load when the client disconnects** (verified 2026-08-16), so the timeout must outlast the slowest load. Measured 28 GB: 303 s cold / 127 s warm. Collectors keep their 8 s agent — a 5 s poll and a 10 min load cannot share timeouts |
+| Proxy timeouts (502/504) | Treated as "still watching", not as failure | Nginx's timeout severs browser↔container; the container↔Ollama request is untouched and completes. Verified 2026-08-16 through `ollama-monitor.techgraft.net`: the model loaded despite a 504. Raising `proxy_read_timeout` to 1800 s is still recommended for honest feedback |
+| Load success signal | Model appearing in `/api/ps`, not the HTTP response | `/api/ps` stays empty for the whole load and lists the model only once fully resident (verified), so it is authoritative and immune to what any single client does |
+| Available-model list | Fetched once at page load + manual ↻ | `/api/tags` changes only on `pull`/`rm` — events outside the dashboard that cannot be detected, and that load/unload never cause |
+| Pending-load indicator | `localStorage.pendingModelLoad`, cosmetic only | Survives F5 during a multi-minute load. Truth still comes from `/api/ps`, so a stale entry cannot desynchronise anything; entries older than 15 min are dropped |
 
 ---
 
@@ -108,6 +117,7 @@ Copy `.env.example` → `.env` and fill in:
 | `NETWORK_HOST_IFACE` | Host/bond interface shown as summary row (e.g. `br0`) | optional |
 | `NETWORK_LINK_SPEED_MBIT` | Override auto-detected link speed in Mbit/s | optional |
 | `SSH_KEY_PATH` | Key path inside container (default: `/root/.ssh/id_ed25519`) | optional |
+| `MODEL_ACTION_TIMEOUT_SEC` | Socket timeout for load/unload requests to Ollama (default: 1800, min 30). Raise it, never lower it — a timeout makes Ollama cancel the load | optional |
 
 Generate `SSH_PRIVATE_KEY_B64`:
 ```bash
@@ -207,10 +217,35 @@ curl http://localhost:3788/api/gpu
 curl http://localhost:3788/api/gpu-procs
 curl http://localhost:3788/api/memory
 curl http://localhost:3788/api/ollama-app
+curl http://localhost:3788/api/models
 
 # Action test (be careful!)
 curl -X POST http://localhost:3788/api/wake
+
+# Model actions — unload is instant, load can take minutes
+curl -X POST http://localhost:3788/api/unload-model \
+  -H 'Content-Type: application/json' -d '{"model":"<name>"}'
+time curl -X POST http://localhost:3788/api/load-model \
+  -H 'Content-Type: application/json' -d '{"model":"<name>"}'
 ```
+
+---
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs Node's built-in test runner over `test/`. Coverage is deliberately limited to pure
+functions — `mapTags` and `findModel` in `src/collectors/ollamaModels.js`. Everything that
+touches HTTP, SSH or the DOM is verified manually with the curl commands above and in the
+browser; `public/app.js` is a classic script, not an ES module, so a runner cannot import it.
+
+The `test` script globs `test/*.test.js` rather than passing the directory: on Node 24
+`node --test test/` treats the directory as an entry module and fails with `MODULE_NOT_FOUND`
+before running anything — a failure easily mistaken for a missing import in the code
+under test.
 
 ---
 

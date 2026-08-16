@@ -5,6 +5,7 @@ import { getIpmiStatus } from './collectors/ipmi.js';
 import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getOllamaAppStats } from './collectors/ollamaApp.js';
+import { getAvailableModels, findModel } from './collectors/ollamaModels.js';
 import { getGpuStatus } from './collectors/gpu.js';
 import { getGpuProcs } from './collectors/gpuProcs.js';
 import { getMemoryStatus } from './collectors/memory.js';
@@ -14,6 +15,8 @@ import { sleepServer } from './actions/sleep.js';
 import { restartOllama } from './actions/restartOllama.js';
 import { upgradeOllama } from './actions/upgradeOllama.js';
 import { checkUpdate } from './actions/checkUpdate.js';
+import { loadModel } from './actions/loadModel.js';
+import { unloadModel } from './actions/unloadModel.js';
 
 export const router = Router();
 
@@ -65,6 +68,10 @@ router.get('/ollama', async (_req, res) => {
   res.json(await safeCollect(getOllamaStatus));
 });
 
+router.get('/models', async (_req, res) => {
+  res.json(await safeCollect(getAvailableModels));
+});
+
 router.get('/ollama-app', async (_req, res) => {
   res.json(await safeCollect(getOllamaAppStats));
 });
@@ -112,6 +119,39 @@ router.post('/restart-ollama', async (_req, res) => {
 router.post('/upgrade-ollama', async (_req, res) => {
   try {
     res.json(await upgradeOllama());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Validate against the installed-model list so a typo yields a clear 400
+// instead of Ollama's bare 404. Not an injection defence — the name travels
+// as JSON to an HTTP API, never to a shell.
+async function resolveModelName(req, res) {
+  const list = await getAvailableModels();
+  const found = findModel(list.models, req.body?.model);
+  if (!found) {
+    res.status(400).json({ error: `Unknown model: ${req.body?.model ?? ''}` });
+    return null;
+  }
+  return found.name;
+}
+
+router.post('/load-model', async (req, res) => {
+  try {
+    const name = await resolveModelName(req, res);
+    if (!name) return;
+    res.json(await loadModel(name));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/unload-model', async (req, res) => {
+  try {
+    const name = await resolveModelName(req, res);
+    if (!name) return;
+    res.json(await unloadModel(name));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
