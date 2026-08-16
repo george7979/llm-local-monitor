@@ -108,6 +108,26 @@ Spec: `docs/superpowers/specs/2026-07-04-gpu-process-modal-design.md`
 
 ---
 
+## Milestone: v1.4.0 — Model load / unload
+
+**Status:** 🚧 Implemented, pending deployment check (2026-08-16)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | `ollamaModels` collector + `GET /api/models` (Ollama `/api/tags`); `npm test` via `node:test` | ✅ Done |
+| 2 | `loadModel` / `unloadModel` actions + POST endpoints, validated against the installed list | ✅ Done |
+| 3 | Per-row Unload button in LOADED MODELS + pending-load ghost row persisted in `localStorage` | ✅ Done |
+| 4 | Model browser modal: catalog, filter, manual ↻, residency markers | ✅ Done |
+| 5 | End-to-end verification in browser (load, F5 mid-load, failure paths, external changes) | ✅ Done |
+| 6 | Documentation | ✅ Done |
+| 7 | **Reverse proxy check on the Dockge host** — loads run for minutes and Ollama cancels on client disconnect | ⛔ Blocking deployment |
+| 8 | User acceptance test on target server (Dockge) | ⬜ To do |
+
+Spec: `docs/superpowers/specs/2026-08-16-model-load-unload-design.md`
+Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
+
+---
+
 ## v2 Backlog (after v1 stabilization)
 
 - [ ] SQLite: per-minute GPU/memory samples, 7-day retention

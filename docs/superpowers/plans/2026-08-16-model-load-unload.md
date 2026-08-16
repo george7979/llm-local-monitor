@@ -964,10 +964,10 @@ If a proxy is in the path, raise its read timeout (`proxy_read_timeout 1800s` in
 compensate. Record the finding in the spec's Timeouts section. Local development connects
 directly, so this cannot surface in dev.
 
-- [ ] **Step 4: Decide the Expires column**
+- [x] **Step 4: Decide the Expires column** — implemented in Task 3.
 
 Measured 2026-08-16: under `keep_alive: -1` Ollama returns `expires_at` in the **year 2318**,
-not a sentinel far enough out for a naive year threshold. Use a horizon test instead:
+not a sentinel far enough out for a naive year threshold. A horizon test is used instead:
 
 ```js
 const expiresMs = m.expiresAt ? new Date(m.expiresAt).getTime() : 0;
@@ -980,7 +980,7 @@ Anything more than a day out is effectively never. If the value is
 sensible, leave the column untouched and delete the *Incidental Cleanup*
 section from the spec.
 
-- [ ] **Step 5: Update the CKM docs**
+- [x] **Step 5: Update the CKM docs** — done 2026-08-16 (TECH.md, PLAN.md, README.md, project CLAUDE.md).
 
 Per the workspace method: `TECH.md` = HOW, `PLAN.md` = WHEN, no overlap.
 

@@ -55,6 +55,9 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama (host from env `LLM
 - `src/collectors/ollama.js` — uses Ollama REST API (`/api/ps`), NOT SSH
 - `src/collectors/ollamaApp.js` — SSH midclt (app status) + cgroup files (CPU/RAM/IO/Net)
 - `src/collectors/gpuProcs.js` — per-GPU process list via SSH (nvidia-smi + /proc cgroup + midclt app.query); container/app name enrichment; `hasOllama` is derived from it in `routes.js`
+- `src/collectors/ollamaModels.js` — installed models via Ollama REST `/api/tags`; exports pure `mapTags` / `findModel` (unit-tested in `test/`)
+- `src/lib/ollamaClient.js` — `POST /api/generate` with a long-timeout dispatcher, separate from the collectors' 8 s one; used only by model actions
+- `src/actions/loadModel.js` / `unloadModel.js` — `keep_alive: -1` loads, `keep_alive: 0` evicts
 - `src/actions/` — NOT cached; each call = real action
 - `src/routes.js` — `/api/status` aggregates collectors via `Promise.all`; when host offline → SSH collectors skipped
 
@@ -66,6 +69,7 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama (host from env `LLM
 - **nvidia-smi** — on TrueNAS CE host; may require availability check
 - **ZFS arcstats** — `/proc/spl/kstat/zfs/arcstats`; if absent → memory.arc = 0
 - **CPU%** — divided by `nproc` to match TrueNAS display (% of total CPU)
+- **Model loading** — Ollama **cancels an in-progress load when the HTTP client disconnects**. `MODEL_ACTION_TIMEOUT_SEC` (default 1800) must outlast the slowest load; lowering it silently throws work away. Never treat the HTTP response as the success signal — a model appearing in `/api/ps` is the only reliable one
 
 ---
 

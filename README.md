@@ -41,6 +41,27 @@ from TrueNAS: `ollama`, `whisper-asr-whisperx`, `open-webui`, etc.
 The `OLLAMA` badge on the cards still shows at a glance where Ollama lives — the modal is for
 the full picture.
 
+## Managing what sits in VRAM
+
+The **Loaded models** panel is no longer read-only.
+
+- **Unload** next to any resident model frees its VRAM without touching the others. Until now
+  the only option was *Restart Ollama*, which drops everything.
+- **Models…** opens the catalog of everything installed on the server, with a name filter and
+  a **Load** button per model. Models already in memory are marked and offer *Unload* there
+  too, so making room and loading something else takes one visit.
+- The catalog is fetched once per page load; press **↻** after an `ollama pull` or `rm` on the
+  host.
+
+A load can run for minutes — a 28 GB model takes about 5 minutes from cold storage. The
+dashboard shows a placeholder row with a running counter and keeps polling; the model appears
+as a normal row the moment Ollama reports it resident. Reloading the page mid-load is safe, and
+the counter picks up where it was.
+
+> **Deploying behind a reverse proxy?** Raise its read timeout to at least 1800 s. Ollama
+> cancels a load if the client disconnects, so a proxy timing out at the usual 60 s makes large
+> models impossible to load.
+
 ## Panels
 
 | Panel | Shows | Data source |
@@ -49,7 +70,7 @@ the full picture.
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
 | **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
 | **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
-| **Loaded models** | Model, size, quant, GPU/CPU split, context | Ollama REST API `:11434/api/ps` |
+| **Loaded models** | Model, size, quant, GPU/CPU split, context + per-model **Unload**; **Models…** opens a browser of everything installed, with filter and one-click load | Ollama REST API `:11434/api/ps` and `/api/tags` |
 | **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge; click a card → per-process modal with app names | SSH → `nvidia-smi` + `/proc/<pid>/cgroup` + `midclt` |
 
 ---
