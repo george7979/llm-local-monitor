@@ -152,7 +152,7 @@ at click time, not by a polled collector.
 | 6 | End-to-end verification against the live server | ✅ Done |
 | 7 | Verify the *enabled* path once any app actually has an update waiting | ✅ Done — user acceptance test on the `#dev` build, 2026-08-17 |
 | 8 | Release: bump to v1.5.0, merge dev → main, GitHub release | ✅ Done |
-| 9 | Point the Dockge stack back at `#main` and rebuild on v1.5.0 | 🚧 Operator, 2026-08-17 |
+| 9 | Point the Dockge stack back at `#main` and rebuild on v1.5.0 | ✅ Done — `/api/config` reports `1.5.0`, all 9 collectors error-free |
 
 **Verification status, 2026-08-17.** Both paths are proven. The no-op path was
 confirmed first, on a host where all 7 apps were current: 13/13 unit tests;
