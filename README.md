@@ -30,7 +30,7 @@ Ever wondered *what exactly* is sitting on a GPU? Click any GPU card to find out
 
 A modal opens with every compute process running on that card — and instead of the cryptic
 binary paths `nvidia-smi` gives you (`/app/.venv/bin/python`...), you see the **actual app name**
-from TrueNAS: `ollama`, `whisper-asr-whisperx`, `open-webui`, etc.
+from TrueNAS — `ollama` and whatever else happens to be sharing the card.
 
 - **Container** — TrueNAS app / container name (the label you actually recognize)
 - **Binary** — executable name, full path in the tooltip
