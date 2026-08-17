@@ -1,7 +1,7 @@
 # Product Requirements Document — llm-local-monitor
 
-**Version:** 1.2.2
-**Date:** 2026-06-18
+**Version:** 1.5.0
+**Date:** 2026-08-17
 **Author:** Jerzy Maczewski
 **Purpose:** Web dashboard for monitoring a GPU server running Ollama
 

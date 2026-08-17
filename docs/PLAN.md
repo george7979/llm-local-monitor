@@ -1,7 +1,7 @@
 # Plan — llm-local-monitor
 
-**Version:** 1.2.2
-**Date:** 2026-06-18
+**Version:** 1.5.0
+**Date:** 2026-08-17
 
 ---
 
@@ -124,7 +124,7 @@ Spec: `docs/superpowers/specs/2026-07-04-gpu-process-modal-design.md`
 | 8 | Raise `proxy_read_timeout` to 1800 s in Nginx | ❌ Won't do — decided 2026-08-17. Purely cosmetic: loads complete either way, and "The proxy stopped waiting" after ~60 s is acceptable feedback |
 | 9 | User acceptance test on target server (Dockge, `#dev` build) | ✅ Done |
 | 10 | Fixes found during acceptance: embedding models rejected by `/api/generate`, proxy 502/504 misreported as failure, RAM panel using `MemFree`, `Expires` glyph illegible | ✅ Done |
-| 11 | Point the Dockge stack back at `#main` and rebuild on v1.4.0 | 🚧 Operator, 2026-08-17 |
+| 11 | Point the Dockge stack back at `#main` and rebuild on v1.4.0 | ✅ Done — later moved to `#dev` again for the v1.5.0 acceptance test |
 
 Spec: `docs/superpowers/specs/2026-08-16-model-load-unload-design.md`
 Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
@@ -133,7 +133,7 @@ Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
 
 ## Milestone: v1.5.0 — Update all apps, not just Ollama
 
-**Status:** 🚧 In progress (started 2026-08-17)
+**Status:** ✅ Done (released 2026-08-17)
 
 Same two triggers, same gating on Ollama's flag — only the action widens. Ollama
 needing an update is the occasion to sweep every other TrueNAS app that has one,
@@ -148,20 +148,21 @@ at click time, not by a polled collector.
 | 3 | `POST /api/upgrade-ollama` → `POST /api/upgrade-apps`; old route dropped, no alias | ✅ Done |
 | 4 | UI: button label, badge tooltip, confirm text, result line naming the apps upgraded | ✅ Done |
 | 5 | Documentation (PRD FR2.5, TECH endpoint + decisions, README) | ✅ Done |
-| 6 | End-to-end verification against the live server | ⚠️ Partial — see below |
-| 7 | Verify the *enabled* path once any app actually has an update waiting | ⬜ Blocked |
-| 8 | Release: bump to v1.5.0, merge dev → main, GitHub release | ⬜ |
+| 6 | End-to-end verification against the live server | ✅ Done |
+| 7 | Verify the *enabled* path once any app actually has an update waiting | ✅ Done — user acceptance test on the `#dev` build, 2026-08-17 |
+| 8 | Release: bump to v1.5.0, merge dev → main, GitHub release | ✅ Done |
+| 9 | Point the Dockge stack back at `#main` and rebuild on v1.5.0 | 🚧 Operator, 2026-08-17 |
 
-**Verification status, 2026-08-17.** All 7 apps on the host were current, so the
-disabled/no-op path is proven and the upgrade path is not. Confirmed: 13/13 unit
-tests; `app.query` + `selectPending` against the live host returning an empty
-selection (so `upgradeApps` early-returns before any mutating midclt call);
-`POST /api/upgrade-apps` → `{"ok":true,"jobIds":[],"apps":[]}`; the removed
-`POST /api/upgrade-ollama` → 404; the page rendering with **Update all apps**
-greyed out and the badge reading `✓ Up to date`, no console errors beyond a
-pre-existing missing `favicon.ico`. **Not yet exercised:** `app.upgrade_bulk`,
-`app.pull_images`, and the result line naming the upgraded apps — all three need
-an app with a pending update.
+**Verification status, 2026-08-17.** Both paths are proven. The no-op path was
+confirmed first, on a host where all 7 apps were current: 13/13 unit tests;
+`app.query` + `selectPending` returning an empty selection (so `upgradeApps`
+early-returns before any mutating midclt call); `POST /api/upgrade-apps` →
+`{"ok":true,"jobIds":[],"apps":[]}`; the removed `POST /api/upgrade-ollama` →
+404; the page rendering with **Update all apps** greyed out and the badge
+reading `✓ Up to date`, no console errors beyond a pre-existing missing
+`favicon.ico`. The upgrade path was then exercised in the user acceptance test
+on the `#dev` build once an app had a pending update — `app.upgrade_bulk` /
+`app.pull_images` ran and the result line named the apps upgraded.
 
 Rejected during design, recorded so it is not re-litigated:
 
