@@ -137,7 +137,8 @@ Plan: `docs/superpowers/plans/2026-08-16-model-load-unload.md`
 
 Same two triggers, same gating on Ollama's flag — only the action widens. Ollama
 needing an update is the occasion to sweep every other TrueNAS app that has one,
-so updates on `cloudflared`, `portainer` and friends stop going unnoticed.
+so pending updates elsewhere on the host stop going unnoticed. Whichever apps the
+host happens to run are picked up as they are — nothing is named or configured.
 Monitoring stays Ollama-only by decision: the app list is read inside the action
 at click time, not by a polled collector.
 

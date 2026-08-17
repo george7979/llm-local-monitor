@@ -80,8 +80,8 @@ No commit (nothing in repo changed).
 > folded into Task 2 below: (1) local `.env` uses `SSH_KEY_PATH`, not `SSH_PRIVATE_KEY_B64`
 > (the latter exists only inside the container); (2) `docker ps` is not accessible to
 > `truenas_admin` (no docker.sock access, no passwordless sudo) — the ID→name map is built
-> from `midclt call app.query` instead, yielding TrueNAS app names (`ollama`,
-> `whisper-asr-whisperx`), which are nicer labels anyway. Cgroup format confirmed:
+> from `midclt call app.query` instead, yielding TrueNAS app names (e.g.
+> `ollama`), which are nicer labels anyway. Cgroup format confirmed:
 > `0::/docker/<64-hex>`. Observed live output: 3 processes, all with resolved names.
 
 ---

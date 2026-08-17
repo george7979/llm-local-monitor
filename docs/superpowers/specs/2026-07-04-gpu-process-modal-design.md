@@ -10,7 +10,7 @@
 Make each GPU card in the dashboard clickable. Clicking opens a modal listing all compute
 processes running on that GPU, enriched with **container names** instead of only the raw
 executable path that `nvidia-smi` reports (e.g. `/usr/bin/python3`). Names are resolved to
-**TrueNAS app names** (e.g. `ollama`, `whisper-asr-whisperx`) via `midclt call app.query` —
+**TrueNAS app names** (e.g. `ollama`) via `midclt call app.query` —
 verified on the live host 2026-07-04 (`docker ps` is not accessible to `truenas_admin`).
 Raw binary name remains as fallback for processes that are not in a container or when
 enrichment fails.

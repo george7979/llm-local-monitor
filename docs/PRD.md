@@ -52,7 +52,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, independent from OS state
 - **FR1.8** Display server uptime in SERVER card
 - **FR1.9** Display LAN port throughput as live histograms (optional widget, requires configuration)
-- **FR1.10** Show which workload occupies each GPU: clicking a GPU card opens a modal listing all compute processes on that card with a **meaningful name** (TrueNAS app / container name, e.g. `ollama`, `whisper-asr-whisperx`) instead of a raw binary path, plus PID and VRAM usage; the list live-refreshes while open
+- **FR1.10** Show which workload occupies each GPU: clicking a GPU card opens a modal listing all compute processes on that card with a **meaningful name** (TrueNAS app / container name, e.g. `ollama`) instead of a raw binary path, plus PID and VRAM usage; the list live-refreshes while open
 
 ### FR2: Server control
 
