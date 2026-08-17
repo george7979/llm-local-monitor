@@ -72,7 +72,7 @@ the counter picks up where it was.
 
 | Panel | Shows | Data source |
 |-------|-------|-------------|
-| **Server** | Alive/Offline + Wake/Shut down/Restart Ollama/Update Ollama | TCP probe, IPMI |
+| **Server** | Alive/Offline + Wake/Shut down/Restart Ollama/Update all apps | TCP probe, IPMI |
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
 | **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
 | **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
