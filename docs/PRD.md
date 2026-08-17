@@ -60,7 +60,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR2.2** **Shut down** button — gracefully shuts down the server
 - **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
 - **FR2.4** Buttons enabled/disabled based on host state
-- **FR2.5** **Upgrade Ollama** — triggers upgrade via TrueNAS midclt; available both as the pulsing `⬆ Update` badge in OLLAMA APP card and as an **Update Ollama** button in the SERVER card. The button is greyed out when no upgrade is available (same pattern as the Wake button)
+- **FR2.5** **Update all apps** — triggers an upgrade of *every* TrueNAS app with an update waiting, via midclt; available both as the pulsing `⬆ Update` badge in OLLAMA APP card and as an **Update all apps** button in the SERVER card. Both remain gated on Ollama's own upgrade flag: Ollama needing an update is the occasion to sweep the rest, so the button is greyed out when Ollama is current (same pattern as the Wake button). The dashboard monitors Ollama only; the other apps are enumerated server-side at click time and named back in the result line
 
 ### FR3: Navigation
 

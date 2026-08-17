@@ -504,8 +504,8 @@ function renderOllamaApp(data) {
   const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update clickable' : 'ok'}`,
     data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
   if (data.upgradeAvailable) {
-    updateBadge.title = 'Click to upgrade Ollama in TrueNAS';
-    updateBadge.onclick = () => upgradeOllamaApp();
+    updateBadge.title = 'Click to update every TrueNAS app that has an update waiting';
+    updateBadge.onclick = () => upgradeAllApps();
   }
   statusRow.appendChild(stateBadge);
   statusRow.appendChild(updateBadge);
@@ -829,13 +829,23 @@ async function checkForUpdate() {
 
 // ── Actions ───────────────────────────────────────────────────────────
 
-async function upgradeOllamaApp(msgId = 'ollama-upgrade-msg') {
-  if (!confirm('Upgrade Ollama in TrueNAS?\nOllama will be unavailable for a few minutes during the update.')) return;
+// Triggered from Ollama's update badge, but not limited to Ollama: the list of
+// apps is resolved server-side at call time, so the names are only known once
+// the response comes back — hence the generic confirm and the specific result.
+async function upgradeAllApps(msgId = 'ollama-upgrade-msg') {
+  if (!confirm('Update every TrueNAS app that has an update waiting?\n' +
+               'Each one restarts as it upgrades — Ollama will be unavailable for a few minutes.')) return;
   const msg = document.getElementById(msgId);
-  msg.textContent = 'Upgrade started — Ollama will restart automatically...';
+  msg.textContent = 'Upgrade started — apps will restart automatically...';
   try {
-    const res = await apiFetch('/api/upgrade-ollama', { method: 'POST' });
-    msg.textContent = res.ok ? 'Upgrading... check Ollama status in a few minutes.' : 'Error: ' + (res.error || '?');
+    const res = await apiFetch('/api/upgrade-apps', { method: 'POST' });
+    if (!res.ok) {
+      msg.textContent = 'Error: ' + (res.error || '?');
+    } else if (!res.apps.length) {
+      msg.textContent = 'Nothing to upgrade — every app is already current.';
+    } else {
+      msg.textContent = `Upgrading ${res.apps.length} app(s): ${res.apps.join(', ')} — check back in a few minutes.`;
+    }
   } catch (e) {
     msg.textContent = 'Error: ' + e.message;
   }

@@ -20,7 +20,7 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
   ├── POST /api/restart-ollama → SSH → midclt call app.stop/start
-  ├── POST /api/upgrade-ollama → SSH → midclt call app.upgrade
+  ├── POST /api/upgrade-apps   → SSH → midclt call app.query, then app.upgrade_bulk / app.pull_images
   ├── POST /api/load-model     → Ollama REST /api/generate, keep_alive:-1
   └── POST /api/unload-model   → Ollama REST /api/generate, keep_alive:0
         ↓ SSH (ed25519, decoded from SSH_PRIVATE_KEY_B64)
@@ -42,7 +42,10 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | IPMI status | TCP probe port 443 on `$IPMI_HOST` | IPMI web interface responds even when server is powered off — availability signal independent from SSH/OS |
 | Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
-| Upgrade Ollama UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeOllamaApp(msgId)` routes feedback to the calling card |
+| Update-all UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeAllApps(msgId)` routes feedback to the calling card |
+| App list read in the action, not a collector | `upgradeApps()` calls `app.query` itself | Collectors are polled and cached; this answer must be fresh at click time, and monitoring stays deliberately Ollama-only — no extra SSH session per poll |
+| Two upgrade paths | `app.upgrade_bulk` for charts, `app.pull_images` for image-only | `upgrade_available` is a chart bump and pulls new images with it; `image_updates_available` alone is a fresher tag on the same chart, which `app.upgrade` does not handle. There is no bulk form of `pull_images` |
+| `snapshot_hostpaths` left off | Default `false`, as before | Only `ollama` uses `host_path` (463 GB of model blobs on `nvme_pcie`, 303 GB free); ZFS snapshots are free at creation but pin freed blocks afterwards, and nothing here prunes them. The apps with real config-migration risk sit on `ix_volume`, which the option does not cover. `app.rollback` remains the tool for a broken upgrade |
 | GPU process names | PID → `/proc/<pid>/cgroup` → `midclt call app.query` on host | nvidia-smi reports only binary paths; TrueNAS app name (e.g. `ollama`) is the meaningful label; `docker ps` not accessible to `truenas_admin`; single SSH round-trip keeps it atomic |
 | Load / unload models | `POST /api/generate` with `keep_alive: -1` / `0`, `stream: false` | Ollama has no dedicated load/unload endpoints. `stream: false` keeps the whole operation inside one response, so a single timeout governs it |
 | Model-action timeout | Own `undici.Agent`, `MODEL_ACTION_TIMEOUT_SEC` (default 1800) | **Ollama cancels an in-progress load when the client disconnects** (verified 2026-08-16), so the timeout must outlast the slowest load. Measured 28 GB: 303 s cold / 127 s warm. Collectors keep their 8 s agent — a 5 s poll and a 10 min load cannot share timeouts |

@@ -13,7 +13,7 @@ import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
 import { sleepServer } from './actions/sleep.js';
 import { restartOllama } from './actions/restartOllama.js';
-import { upgradeOllama } from './actions/upgradeOllama.js';
+import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
@@ -116,9 +116,11 @@ router.post('/restart-ollama', async (_req, res) => {
   }
 });
 
-router.post('/upgrade-ollama', async (_req, res) => {
+// Gated in the UI on Ollama's update flag, but upgrades every app that has one
+// — the Ollama update is the occasion, not the scope.
+router.post('/upgrade-apps', async (_req, res) => {
   try {
-    res.json(await upgradeOllama());
+    res.json(await upgradeApps());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
