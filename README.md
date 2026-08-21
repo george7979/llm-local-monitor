@@ -13,7 +13,7 @@ Dashboard for monitoring a local LLM server running **TrueNAS CE** with GPU card
 
 The monitor runs as a Docker container on the Dockge host and queries the GPU server over SSH.
 
-![Screenshot](pics/dashboard-eng-7.png)
+![Screenshot](pics/dashboard-eng-1.5-a.png)
 
 ## Theme
 
@@ -57,6 +57,8 @@ The **Loaded models** panel both reports residency and changes it.
 - Embedding models (`embeddinggemma`, `nomic-embed-*`) can be unloaded but not loaded from
   here — Ollama has no way to warm them without an actual embedding request, and the clients
   that use them load them on demand anyway.
+
+![Available models](pics/dashboard-eng-1.5-b.png)
 
 A load can run for minutes — a 28 GB model takes about 5 minutes from cold storage. The
 dashboard shows a placeholder row with a running counter and keeps polling; the model appears
