@@ -209,6 +209,8 @@ button:disabled { opacity: .3; cursor: not-allowed; }
   font-family: var(--mono); font-size: 11px; color: var(--dim);
   line-height: 1.5;
 }
+/* A failed action must not read like the dim progress lines around it. */
+.action-msg.is-error { color: var(--red); }
 
 /* ── OLLAMA TABLE ──────────────────────────── */
 
@@ -563,6 +565,15 @@ tbody tr:last-child td { border-bottom: none; }
   min-width: min(420px, calc(100vw - 32px)); max-width: 90vw;
   max-height: 80vh; overflow: auto;
 }
+/* The models list is the only modal long enough to scroll. Keep the scroll
+   inside the list so the head, the filter and #models-msg stay put: scrolling
+   the whole modal pushed the action message out of view exactly when an action
+   reported back, which read as no feedback at all. min-height:0 lets the body
+   shrink below its content instead of forcing the modal past max-height. */
+#models-modal .modal { display: flex; flex-direction: column; overflow: hidden; }
+#models-modal #models-msg { margin-bottom: 8px; }
+#models-modal #models-modal-body { overflow-y: auto; min-height: 0; }
+
 .modal-head {
   display: flex; justify-content: space-between; align-items: flex-start;
   gap: 16px; margin-bottom: 14px;

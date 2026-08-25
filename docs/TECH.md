@@ -284,3 +284,47 @@ Every 6h     → /api/check-update → server (GitHub or 1h cache)
 | ipmitool error | Wrong `IPMI_HOST`, user or password | Test: `ipmitool -I lanplus -H $IPMI_HOST -U $IPMI_USER -P $IPMI_PASS chassis status` |
 | Memory arc = 0 | `/proc/spl/kstat/zfs/arcstats` unavailable | Check: `ssh $LLM_USER@$LLM_HOST lsmod \| grep zfs` |
 | ollamaApp: parse error | `midclt` not installed or no permissions | Test: `ssh $LLM_USER@$LLM_HOST midclt call core.ping` |
+| A model fails instantly with `option "stop" must be of type array` | Its stored parameters keep `stop` as a scalar; Ollama 0.32 requires an array | Rebuild the manifest — see _Repairing a model rejected by parameter validation_ |
+
+### Repairing a model rejected by parameter validation
+
+Ollama 0.32 validates a model's stored parameters on load and rejects a `stop`
+saved as a scalar rather than an array. Three properties make this hard to
+recognise from the UI:
+
+- **It fails in ~0.1 s with HTTP 500**, before any VRAM is touched, so nothing
+  moves on the GPUs and it reads as "nothing happened"
+- **Every client fails identically** — the fault is in the model's manifest,
+  not in the caller, so a second tool reproducing it is expected, not a clue
+- **Overriding `stop` in the request's `options` does not help**: validation
+  runs against the model's own parameters before request options are merged
+
+Models built by `ollama create` from a local GGUF are the ones affected —
+a Modelfile written for an older Ollama could store the scalar form.
+
+Inspect what the model actually stores:
+
+```bash
+curl -s -X POST http://$LLM_HOST:11434/api/show -d '{"model":"<model>"}'
+```
+
+Rebuild the manifest under its own name, passing `stop` as an array and
+carrying over every other parameter it already had. The GGUF blob is shared,
+so this consumes no extra disk and completes in well under a second:
+
+```bash
+curl -s -X POST http://$LLM_HOST:11434/api/create -d '{
+  "model": "<model>", "from": "<model>",
+  "parameters": { "stop": ["<token>"], "num_gpu": 99, "temperature": 0.1 },
+  "stream": false }'
+```
+
+Verify with a **real** load. `keep_alive:0` is not a test — it returns HTTP 200
+without loading anything and passes whether or not the repair worked. Only
+residency in `/api/ps` proves it:
+
+```bash
+curl -s -X POST http://$LLM_HOST:11434/api/generate \
+  -d '{"model":"<model>","prompt":"","keep_alive":-1,"stream":false}'
+curl -s http://$LLM_HOST:11434/api/ps    # the model must appear here
+```
