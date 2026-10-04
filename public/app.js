@@ -518,7 +518,9 @@ function renderOllamaApp(data) {
   statusRow.appendChild(updateBadge);
 
   const imageEl = document.getElementById('ollama-app-image');
-  if (imageEl) { imageEl.textContent = data.image || ''; imageEl.title = data.image || ''; }
+  // TrueNAS pins the image by digest — show only repo:tag, keep the full reference in the tooltip
+  const image = data.image || '';
+  if (imageEl) { imageEl.textContent = image.split('@')[0]; imageEl.title = image; }
   wrap.appendChild(statusRow);
 
   // Stats grid

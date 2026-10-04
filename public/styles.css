@@ -121,6 +121,8 @@ main {
 .top-row.no-network {
   grid-template-columns: 260px 1fr 1fr;
 }
+/* 1fr = minmax(auto, 1fr): without this a long nowrap label widens its column */
+.top-row > .card { min-width: 0; }
 
 /* ── CARD ──────────────────────────────────── */
 

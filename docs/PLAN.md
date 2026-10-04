@@ -174,6 +174,20 @@ Rejected during design, recorded so it is not re-litigated:
 
 ---
 
+## Milestone: v1.5.1 — UI fixes
+
+**Status:** 🔄 In progress
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Models modal: scroll on the list, so action messages stay in view; errors in the error colour | ✅ Done |
+| 2 | OLLAMA APP card: TrueNAS reports the image pinned by digest (`repo:tag@sha256:…`) — the label shows `repo:tag`, the full reference stays in the tooltip | ✅ Done |
+| 3 | Top-row cards get `min-width: 0` — a `1fr` track is `minmax(auto, 1fr)`, so any long nowrap label widened its column and ignored the ellipsis | ✅ Done |
+| 4 | Release: bump to v1.5.1, merge dev → main, GitHub release | ⏳ Pending |
+| 5 | Rebuild the Dockge stack on `#main` | ⏳ Pending |
+
+---
+
 ## v2 Backlog (after v1 stabilization)
 
 - [ ] SQLite: per-minute GPU/memory samples, 7-day retention
