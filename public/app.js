@@ -8,6 +8,13 @@ function el(tag, cls, text) {
   return e;
 }
 
+// Text and error styling are set together: an action message that stays in the
+// dim progress colour after a failure reads as no feedback at all.
+function setMsg(node, text, isError = false) {
+  node.textContent = text;
+  node.classList.toggle('is-error', isError);
+}
+
 // ── GPU modal state ──────────────────────────────────────────────────
 let gpuModalBusId = null;
 let lastGpuSnapshot = { gpu: null, procs: null };
@@ -65,10 +72,10 @@ async function refreshAvailableModels() {
     const data = await apiFetch('/api/models');
     if (data.error) throw new Error(data.error);
     availableModels = data.models || [];
-    msg.textContent = '';
+    setMsg(msg, '');
   } catch (e) {
     availableModels = [];
-    msg.textContent = 'Could not load model list: ' + e.message;
+    setMsg(msg, 'Could not load model list: ' + e.message, true);
   }
   if (modelsModalOpen) renderModelsModal();
 }
@@ -511,7 +518,9 @@ function renderOllamaApp(data) {
   statusRow.appendChild(updateBadge);
 
   const imageEl = document.getElementById('ollama-app-image');
-  if (imageEl) { imageEl.textContent = data.image || ''; imageEl.title = data.image || ''; }
+  // TrueNAS pins the image by digest — show only repo:tag, keep the full reference in the tooltip
+  const image = data.image || '';
+  if (imageEl) { imageEl.textContent = image.split('@')[0]; imageEl.title = image; }
   wrap.appendChild(statusRow);
 
   // Stats grid
@@ -836,20 +845,20 @@ async function upgradeAllApps(msgId = 'ollama-upgrade-msg') {
   if (!confirm('Update every TrueNAS app that has an update waiting?\n' +
                'Each one restarts as it upgrades — Ollama will be unavailable for a few minutes.')) return;
   const msg = document.getElementById(msgId);
-  msg.textContent = 'Upgrade started — apps will restart automatically...';
+  setMsg(msg, 'Upgrade started — apps will restart automatically...');
   try {
     const res = await apiFetch('/api/upgrade-apps', { method: 'POST' });
     if (!res.ok) {
-      msg.textContent = 'Error: ' + (res.error || '?');
+      setMsg(msg, 'Error: ' + (res.error || '?'), true);
     } else if (!res.apps.length) {
-      msg.textContent = 'Nothing to upgrade — every app is already current.';
+      setMsg(msg, 'Nothing to upgrade — every app is already current.');
     } else {
-      msg.textContent = `Upgrading ${res.apps.length} app(s): ${res.apps.join(', ')} — check back in a few minutes.`;
+      setMsg(msg, `Upgrading ${res.apps.length} app(s): ${res.apps.join(', ')} — check back in a few minutes.`);
     }
   } catch (e) {
-    msg.textContent = 'Error: ' + e.message;
+    setMsg(msg, 'Error: ' + e.message, true);
   }
-  setTimeout(() => { msg.textContent = ''; }, 15000);
+  setTimeout(() => { setMsg(msg, ''); }, 15000);
 }
 
 // Kept separate from action() below: that one is name-keyed with hardcoded
@@ -869,7 +878,7 @@ async function doModelAction(kind, name) {
     renderOllama({ models: lastLoadedModels });
   }
   if (modelsModalOpen) renderModelsModal();
-  msg.textContent = kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`;
+  setMsg(msg, kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`);
 
   try {
     await apiFetch(`/api/${kind}-model`, {
@@ -877,9 +886,9 @@ async function doModelAction(kind, name) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: name }),
     });
-    msg.textContent = kind === 'load'
+    setMsg(msg, kind === 'load'
       ? 'Load requested — watching for it to appear.'
-      : `Unloaded ${name}`;
+      : `Unloaded ${name}`);
   } catch (e) {
     // 502/504 come from a proxy between the browser and the container. That
     // leg is separate from the container→Ollama request, which is untouched
@@ -887,12 +896,12 @@ async function doModelAction(kind, name) {
     // Our own timeout arrives as 500 and DOES mean Ollama cancelled the load.
     const proxyGaveUp = e.status === 502 || e.status === 504;
     if (kind === 'load' && proxyGaveUp) {
-      msg.textContent = 'The proxy stopped waiting — the load continues, still watching.';
+      setMsg(msg, 'The proxy stopped waiting — the load continues, still watching.');
     } else {
       if (kind === 'load') clearPending();
-      msg.textContent = /timeout/i.test(e.message)
+      setMsg(msg, /timeout/i.test(e.message)
         ? 'Load aborted — the connection timed out and Ollama cancelled it. Retry.'
-        : 'Error: ' + e.message;
+        : 'Error: ' + e.message, true);
     }
   }
   // Redraw unconditionally: pollAll() swallows its own errors, so relying on
@@ -900,7 +909,7 @@ async function doModelAction(kind, name) {
   // the thing that failed.
   renderOllama({ models: lastLoadedModels });
   if (modelsModalOpen) renderModelsModal();
-  setTimeout(() => { msg.textContent = ''; }, 15000);
+  setTimeout(() => { setMsg(msg, ''); }, 15000);
   pollAll();
 }
 
@@ -912,14 +921,14 @@ async function action(name) {
   if (confirmMsg && !confirm(confirmMsg)) return;
 
   const msg = document.getElementById('action-msg');
-  msg.textContent = { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...';
+  setMsg(msg, { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...');
   try {
     const res = await apiFetch(`/api/${name}`, { method: 'POST' });
-    msg.textContent = res.ok
+    setMsg(msg, res.ok
       ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-ollama': 'Restart queued' }[name] || 'OK')
-      : 'Error: ' + (res.error || '?');
+      : 'Error: ' + (res.error || '?'), !res.ok);
   } catch (e) {
-    msg.textContent = 'Error: ' + e.message;
+    setMsg(msg, 'Error: ' + e.message, true);
   }
-  setTimeout(() => { msg.textContent = ''; }, 8000);
+  setTimeout(() => { setMsg(msg, ''); }, 8000);
 }
