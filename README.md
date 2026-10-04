@@ -243,8 +243,10 @@ Dashboard available at `http://<DOCKGE_HOST>:3788`.
 
 ## Updating after code changes
 
-In Dockge: **Restart** the stack — `no_cache: true` + `pull_policy: build` automatically pulls
-the latest code from GitHub and rebuilds the image.
+In Dockge: **Update** the stack — it ends in `compose up -d`, where `no_cache: true` +
+`pull_policy: build` pull the latest code from GitHub and rebuild the image.
+**Restart** is not enough: it restarts the existing container and keeps the old code.
+Confirm with `curl http://<DOCKGE_HOST>:3788/api/config` — `version` should match the release.
 
 ---
 
