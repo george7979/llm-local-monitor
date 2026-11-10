@@ -20,7 +20,7 @@ import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
-import { appVramBytes, buildEngine, engineAppName, annotateGpus } from './lib/engine.js';
+import { appVramBytes, buildEngine, engineAppName, annotateGpus, modelsSource } from './lib/engine.js';
 import { engineAction } from './lib/engineLock.js';
 
 export const router = Router();
@@ -63,8 +63,9 @@ function readEngine() {
  * is always asked, whatever the app list says — as v1.5.1.
  */
 function collectModels(engine, procs) {
-  if (!engine.enabled || engine.active === 'ollama') return safeCollect(getOllamaStatus);
-  if (engine.active === 'llamacpp') return safeCollect(() => getLlamacppStatus(appVramBytes(procs, cfg.llamacppAppName)));
+  const source = modelsSource(engine);
+  if (source === 'ollama') return safeCollect(getOllamaStatus);
+  if (source === 'llamacpp') return safeCollect(() => getLlamacppStatus(appVramBytes(procs, cfg.llamacppAppName)));
   return Promise.resolve(null);
 }
 

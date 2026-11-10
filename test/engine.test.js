@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList, modelsSource } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -174,4 +174,20 @@ test('upgradeSkipList: from fresh states, both engines on a conflict or none act
   assert.deepEqual(upgradeSkipList(ap('STOPPED', 'RUNNING'), N, true), ['ollama']);
   assert.deepEqual(upgradeSkipList(ap('STOPPED', 'STOPPED'), N, true), ['ollama', 'llama-cpp']);
   assert.deepEqual(upgradeSkipList(ap('RUNNING', 'RUNNING'), N, true), ['ollama', 'llama-cpp']);
+});
+
+test('modelsSource: Ollama whenever llama.cpp is not enabled, else the active engine', () => {
+  const st = { active: null, conflict: false, notFound: null, updatesWaiting: false };
+  // not configured: no engine active, or the app list unreadable → still Ollama
+  assert.equal(modelsSource(buildEngine({ ...st, apps: { ollama: S('STOPPED'), llamacpp: null } }, { configured: false, switching: false })), 'ollama');
+  assert.equal(modelsSource(buildEngine({ error: 'ssh down' }, { configured: false, switching: false })), 'ollama');
+  // configured but its app not found = feature off
+  assert.equal(modelsSource(buildEngine({ ...st, notFound: 'llama-cpp', apps: { ollama: S('STOPPED'), llamacpp: null } }, { configured: true, switching: false })), 'ollama');
+  // enabled
+  const on = active => buildEngine({ ...st, active, apps: { ollama: S('RUNNING'), llamacpp: S('STOPPED') } }, { configured: true, switching: false });
+  assert.equal(modelsSource(on(null)), null);
+  assert.equal(modelsSource(on('ollama')), 'ollama');
+  assert.equal(modelsSource(on('llamacpp')), 'llamacpp');
+  // configured, app list unreadable: no engine known
+  assert.equal(modelsSource(buildEngine({ error: 'ssh down' }, { configured: true, switching: false })), null);
 });

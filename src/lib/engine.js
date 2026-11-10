@@ -110,6 +110,16 @@ export function engineAppName(engine, names, enabled) {
   return engine?.active ? names[engine.active] : null;
 }
 
+/**
+ * Where the model card's data comes from: 'ollama' (`/api/ps`), 'llamacpp'
+ * (llama-server) or null (no engine). Not enabled (llama.cpp unset or its app
+ * not found) → always Ollama, whatever the app list says (v1.5.1).
+ */
+export function modelsSource(engine) {
+  if (!engine?.enabled) return 'ollama';
+  return engine.active === 'ollama' || engine.active === 'llamacpp' ? engine.active : null;
+}
+
 const appByName = (apps, name) => (name ? apps.find(a => a.name === name) : undefined);
 
 /**

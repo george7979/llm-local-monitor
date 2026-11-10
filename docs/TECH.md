@@ -327,7 +327,7 @@ No API key is used (authenticated llama-server is not supported).
 
 ### `/api/status` shape
 
-`ollama` → `models`, `ollamaApp` → `engineApp`, per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). `engine` is `{ active, switching, action, conflict, enabled, notFound, updatesWaiting, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }` (`switching` = an engine action holds the lock, `action` = `'switch' | 'restart' | 'upgrade' | null`), plus `error` when the app list could not be read. With llama.cpp active `models` also carries `speed`, `mtp`, `activity`, `loading` and `slots`. Unconfigured: `engine.apps` has only `ollama`, the switch is not rendered and `switch-engine` returns 404. Without llama.cpp (unconfigured or its app not found) `models` always comes from Ollama's `/api/ps` and the model routes never read the app list. Renamed routes have no aliases.
+`ollama` → `models`, `ollamaApp` → `engineApp`, per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). `engine` is `{ active, switching, action, conflict, enabled, notFound, updatesWaiting, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }` (`switching` = an engine action holds the lock, `action` = `'switch' | 'restart' | 'upgrade' | null`), plus `error` when the app list could not be read. With llama.cpp active `models` also carries `speed`, `mtp`, `activity`, `loading` and `slots`. Unconfigured: `engine.apps` has only `ollama`, the switch is not rendered and `switch-engine` returns 404. Without llama.cpp (unconfigured or its app not found) `models` always comes from Ollama's `/api/ps`; unconfigured, the model routes do not read the app list at all. Renamed routes have no aliases.
 
 ### Switch endpoint
 

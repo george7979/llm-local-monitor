@@ -105,7 +105,7 @@ test('selectPending skips the inactive engine', () => {
 
 **Interfaces — Produces** (all pure, no imports; payload field paths are in the spec, section "llama-server payloads"):
 - `parseMetrics(text) → Record<string, number>` — keys without the `llamacpp:` prefix; comment lines and labelled series (`name{…}`) skipped.
-- `formatParams(n) → string` — `26895998464 → '26.9B'`, `7_600_000_000 → '7.6B'`, `350_000_000 → '350M'`, falsy → `''`.
+- `formatParams(n) → string` — `27_000_000_000 → '27.0B'`, `7_600_000_000 → '7.6B'`, `350_000_000 → '350M'`, falsy → `''`.
 - `mapModelRow(props, models, vramBytes) → { name, parameterSize, quantization, contextLength, sizeVram }`
 - `slotSample(slot, ts) → { ts, idTask, nDecoded, processing }`
 - `liveSpeed(prev, cur) → number|null` — tok/s, one decimal.
@@ -156,32 +156,32 @@ test('liveSpeed', () => {
   assert.equal(liveSpeed(p, { ts: 7000, idTask: 7, nDecoded: 100, processing: true }), null); // nothing decoded
   assert.equal(liveSpeed(null, p), null);
 });
-const SLOT = { id: 0, n_ctx: 200000, is_processing: true, id_task: 7, n_prompt_tokens: 80000, n_prompt_tokens_cache: 75000,
+const SLOT = { id: 0, n_ctx: 131072, is_processing: true, id_task: 7, n_prompt_tokens: 80000, n_prompt_tokens_cache: 75000,
                next_token: [{ n_decoded: 500, n_remain: 100, has_next_token: true }] };
 test('slot helpers', () => {
   assert.deepEqual(slotSample(SLOT, 5), { ts: 5, idTask: 7, nDecoded: 500, processing: true });
-  assert.deepEqual(contextFill(SLOT), { used: 80500, total: 200000, cached: 75000 });
+  assert.deepEqual(contextFill(SLOT), { used: 80500, total: 131072, cached: 75000 });
   assert.equal(activity(SLOT), 'generating');
   assert.equal(activity({ ...SLOT, next_token: [{ n_decoded: 0 }] }), 'reading');
   assert.equal(activity({ ...SLOT, is_processing: false }), 'idle');
   assert.deepEqual(contextFill({ id: 0, n_ctx: 8192, is_processing: false }), { used: 0, total: 8192, cached: 0 });
 });
 test('mapModelRow', () => {
-  const props  = { model_alias: 'model-a', model_ftype: 'Q8_0', default_generation_settings: { n_ctx: 200000 } };
-  const models = { data: [{ id: 'model-a', meta: { n_params: 26895998464, n_ctx: 200000, ftype: 'Q8_0' } }] };
+  const props  = { model_alias: 'model-a', model_ftype: 'Q8_0', default_generation_settings: { n_ctx: 131072 } };
+  const models = { data: [{ id: 'model-a', meta: { n_params: 27_000_000_000, n_ctx: 131072, ftype: 'Q8_0' } }] };
   assert.deepEqual(mapModelRow(props, models, 4096),
-    { name: 'model-a', parameterSize: '26.9B', quantization: 'Q8_0', contextLength: 200000, sizeVram: 4096 });
+    { name: 'model-a', parameterSize: '27.0B', quantization: 'Q8_0', contextLength: 131072, sizeVram: 4096 });
   assert.deepEqual(mapModelRow({}, {}, 0),
     { name: '', parameterSize: '', quantization: '', contextLength: 0, sizeVram: 0 });
 });
 test('launchParams', () => {
-  const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '200000', '-np', '1', '-t', '12', '-ub', '2048', '-b', '4096',
-               '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '4',
-               '--reasoning-budget', '4096', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
+  const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '131072', '-np', '1', '-t', '8', '-ub', '512', '-b', '2048',
+               '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '3',
+               '--reasoning-budget', '2048', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
   assert.deepEqual(launchParams(cmd), [
-    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×4' }, { label: 'slots', value: '1' },
-    { label: 'threads', value: '12' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '4096 / 2048' },
-    { label: 'reasoning', value: '4096' },
+    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
+    { label: 'threads', value: '8' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '2048 / 512' },
+    { label: 'reasoning', value: '2048' },
   ]);
   assert.deepEqual(launchParams(['-c', '8192']), []);
   assert.deepEqual(launchParams(undefined), []);
@@ -268,7 +268,7 @@ test('launchParams', () => {
 Read the spec section "What each card shows" — it fixes the copy and the layout. Element ids and class names containing `ollama` that now serve both engines are renamed to `engine-…`.
 
 - [ ] **Step 1: SERVER card.** Two-segment switch above the action list, rendered only when `engine.enabled`. Active segment highlighted; both disabled while `engine.switching` or host is down. Confirmation text per spec (symmetrical for both directions; when no engine is active: "Start <engine>?"). Warning lines: conflict ("Both engines are running — pick one") and not-found (Review Focus 5). Restart button label follows the active engine; disabled when none. Update button enabled from `engine.updatesWaiting`.
-- [ ] **Step 2: App card.** Title by engine. Update badge from `engine.updatesWaiting` (the active engine's own flag). With llama.cpp: context bar(s) from `models.slots` (reuse `makeGpuBar`; label `82k / 200k`, cache figure beside it) and the launch-parameter lines from `engineApp.launch.params` joined with ` · `, wrapping naturally, `title` = full command. No engine: both apps listed as stopped.
+- [ ] **Step 2: App card.** Title by engine. Update badge from `engine.updatesWaiting` (the active engine's own flag). With llama.cpp: context bar(s) from `models.slots` (reuse `makeGpuBar`; label `52k / 128k`, cache figure beside it) and the launch-parameter lines from `engineApp.launch.params` joined with ` · `, wrapping naturally, `title` = full command. No engine: both apps listed as stopped.
 - [ ] **Step 3: Model card.** By `engine.active`: Ollama → untouched code path. llama.cpp → columns `Model, Params, Quant, VRAM, Ctx`, no action column, **Models…** hidden, header right side shows speed and MTP:
   - `window: 'live'` → `▶ 21.7 tok/s`; `'last'`/`'lifetime'` → dimmed, no marker; `activity: 'reading'` with no live speed → `reading prompt…`; `null` → `—`.
   - MTP: ` · MTP 61%`, omitted entirely when `mtp` is `null`.
