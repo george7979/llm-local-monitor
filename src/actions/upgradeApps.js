@@ -1,23 +1,7 @@
 import { sshExec } from '../lib/ssh.js';
+import { selectPending } from '../lib/engine.js';
 
-/**
- * Splits TrueNAS apps into the two upgrade paths the middleware exposes.
- *
- * `upgrade_available` is a catalog/chart version bump — handled in one shot by
- * `app.upgrade_bulk`, which pulls the new images along the way. An app whose
- * chart is current but whose image tag moved has only `image_updates_available`
- * and needs `app.pull_images`; there is no bulk form of that one.
- *
- * Pure on purpose — the SSH shell below is untestable, this is not.
- */
-export function selectPending(apps) {
-  const charts = [], images = [];
-  for (const a of apps) {
-    if (a.upgrade_available) charts.push(a.name);
-    else if (a.image_updates_available) images.push(a.name);
-  }
-  return { charts, images };
-}
+export { selectPending };
 
 function jobId(raw) {
   const id = parseInt(raw, 10);

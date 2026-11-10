@@ -18,7 +18,7 @@ const ALL_CURRENT = [
 ];
 
 test('an all-current install yields nothing to upgrade', () => {
-  assert.deepEqual(selectPending(ALL_CURRENT), { charts: [], images: [] });
+  assert.deepEqual(selectPending(ALL_CURRENT), { charts: [], images: [], skipped: false });
 });
 
 test('a chart version bump goes to app.upgrade_bulk', () => {
@@ -26,7 +26,7 @@ test('a chart version bump goes to app.upgrade_bulk', () => {
     { name: 'ollama', upgrade_available: true,  image_updates_available: false },
     { name: 'app-a',  upgrade_available: false, image_updates_available: false },
   ];
-  assert.deepEqual(selectPending(apps), { charts: ['ollama'], images: [] });
+  assert.deepEqual(selectPending(apps), { charts: ['ollama'], images: [], skipped: false });
 });
 
 test('a fresher image on the same chart goes to app.pull_images', () => {
@@ -34,14 +34,14 @@ test('a fresher image on the same chart goes to app.pull_images', () => {
     { name: 'ollama', upgrade_available: false, image_updates_available: true },
     { name: 'app-a',  upgrade_available: false, image_updates_available: false },
   ];
-  assert.deepEqual(selectPending(apps), { charts: [], images: ['ollama'] });
+  assert.deepEqual(selectPending(apps), { charts: [], images: ['ollama'], skipped: false });
 });
 
 test('an app flagged both ways is upgraded once, as a chart', () => {
   // app.upgrade pulls the new images as part of the chart bump, so listing it
   // in both buckets would redeploy it a second time for nothing.
   const apps = [{ name: 'ollama', upgrade_available: true, image_updates_available: true }];
-  assert.deepEqual(selectPending(apps), { charts: ['ollama'], images: [] });
+  assert.deepEqual(selectPending(apps), { charts: ['ollama'], images: [], skipped: false });
 });
 
 test('the two buckets are filled independently across apps', () => {
@@ -54,6 +54,7 @@ test('the two buckets are filled independently across apps', () => {
   assert.deepEqual(selectPending(apps), {
     charts: ['ollama', 'app-b'],
     images: ['app-a'],
+    skipped: false,
   });
 });
 
@@ -61,5 +62,5 @@ test('missing flags are treated as no update, not as truthy objects', () => {
   // app.query with a narrow `select` omits keys entirely rather than
   // returning them as false — undefined must not read as "needs upgrade".
   const apps = [{ name: 'ollama' }];
-  assert.deepEqual(selectPending(apps), { charts: [], images: [] });
+  assert.deepEqual(selectPending(apps), { charts: [], images: [], skipped: false });
 });
