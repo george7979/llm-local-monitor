@@ -103,10 +103,13 @@ active engine's segment is highlighted.
 - **Update all apps** never touches the inactive engine's app: upgrading a
   stopped app may start it, which would put both engines on the same GPUs. The
   inactive engine is updated after the owner switches to it. The button (and
-  the app card's update badge) is enabled when an update is waiting for any app
-  other than the inactive engine — which means the app list is now read on
-  every poll, not only at click time as in v1.5.0. The result line names the
-  skipped engine when it had an update pending.
+  the app card's update badge) is enabled when the **active** engine's app has
+  an update waiting — the v1.5.0 rule, applied to whichever engine is active:
+  the engine needing an update is the occasion to sweep the other apps. Known
+  consequence: a llama.cpp custom app pinned by image digest never reports an
+  update, so with it active the button stays grey and other apps are updated
+  from TrueNAS or while Ollama is active. The result line names the skipped
+  engine when it had an update pending.
 
 ### App card
 
