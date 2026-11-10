@@ -48,7 +48,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - **FR1.2** Display list of actively loaded LLM models with parameters. Ollama: size, quantization, GPU/CPU usage, context, expiry time. llama.cpp: alias, parameter count, quantization, VRAM, context, plus generation speed (live while generating, last request when idle) and MTP draft acceptance rate
 - **FR1.3** Display GPU stats: utilization, VRAM, temperature, power draw
 - **FR1.4** Display RAM breakdown: free / ZFS ARC / services
-- **FR1.5** Display the active engine's container stats: CPU%, RAM, Block I/O, Network, app status, version, update availability. With llama.cpp also context fill per slot and the server's launch parameters
+- **FR1.5** Display the active engine's container stats: CPU%, RAM, app status, version, update availability. With llama.cpp also context fill per slot and the server's launch parameters
 - **FR1.6** Auto-refresh every N seconds without user interaction (configurable via `POLL_INTERVAL_SEC`)
 - **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, independent from OS state
 - **FR1.8** Display server uptime in SERVER card

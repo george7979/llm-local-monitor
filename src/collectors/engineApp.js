@@ -34,8 +34,6 @@ export function getEngineAppStats(appName) {
       `echo '===CPU==='; cat $B/cpu.stat`,
       `echo '===MEM==='; cat $B/memory.current`,
       `echo '===MEMMAX==='; cat $B/memory.max`,
-      `echo '===IO==='; cat $B/io.stat`,
-      `echo '===NET==='; cat /proc/$(cat $B/cgroup.procs | head -1)/net/dev 2>/dev/null`,
       `echo '===NPROC==='; nproc`,
     ].join('; ');
 
@@ -44,8 +42,6 @@ export function getEngineAppStats(appName) {
     const cpu   = parseSection(raw, 'CPU');
     const mem   = parseSection(raw, 'MEM');
     const mmax  = parseSection(raw, 'MEMMAX');
-    const io    = parseSection(raw, 'IO');
-    const net   = parseSection(raw, 'NET');
     const nproc = parseInt(parseSection(raw, 'NPROC')) || 1;
 
     // CPU %
@@ -65,28 +61,10 @@ export function getEngineAppStats(appName) {
     const memUsed = parseInt(mem) || 0;
     const memMax  = parseInt(mmax) || 0;
 
-    // Block I/O (cumulative since container start)
-    let ioRead = 0, ioWrite = 0;
-    for (const line of io.split('\n')) {
-      const rm = line.match(/rbytes=(\d+)/);
-      const wm = line.match(/wbytes=(\d+)/);
-      if (rm) ioRead  += parseInt(rm[1]);
-      if (wm) ioWrite += parseInt(wm[1]);
-    }
-
-    // Network (cumulative)
-    let netRx = 0, netTx = 0;
-    for (const line of net.split('\n')) {
-      const m = line.trim().match(/^eth0:\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)/);
-      if (m) { netRx = parseInt(m[1]); netTx = parseInt(m[2]); }
-    }
-
     return {
       ...base,
       cpu:    { pct: cpuPct, cores: nproc },
       memory: { used: memUsed, max: memMax },
-      io:     { read: ioRead, write: ioWrite },
-      network: { rx: netRx, tx: netTx },
     };
   });
 }

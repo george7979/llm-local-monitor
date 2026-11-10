@@ -118,7 +118,7 @@ the counter picks up where it was.
 | **Server** | Alive/Offline + engine switch (llama.cpp configured) + Wake/Shut down/Restart engine/Update all apps | TCP probe, IPMI, `midclt` |
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
 | **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
-| **Ollama App** / **Llama.cpp App** | Status, CPU%, RAM, Block I/O, Network (llama.cpp: + context fill, launch parameters) | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
+| **Ollama App** / **Llama.cpp App** | Status, CPU%, RAM (llama.cpp: + context fill, launch parameters) | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
 | **Loaded models** | Ollama: model, size, quant, GPU/CPU split, context + per-model **Unload**; **Models…** opens a browser of everything installed, with filter and one-click load. llama.cpp: model row + speed and MTP % | Ollama REST API `:11434/api/ps` and `/api/tags`; llama-server `/props`, `/v1/models`, `/slots`, `/metrics` |
 | **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + engine badge; click a card → per-process modal with app names | SSH → `nvidia-smi` + `/proc/<pid>/cgroup` + `midclt` |
 

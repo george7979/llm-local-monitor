@@ -849,19 +849,6 @@ function renderEngineApp(data, eng, host, slots) {
   memCard.appendChild(memBarRow);
   grid.appendChild(memCard);
 
-  // Block I/O
-  const ioCard = el('div', 'app-stat');
-  ioCard.appendChild(el('div', 'app-stat-label', 'BLOCK I/O'));
-  ioCard.appendChild(el('div', 'app-stat-val', `↑ ${fmt(data.io?.write ?? 0)}`));
-  ioCard.appendChild(el('div', 'app-stat-sub', `↓ ${fmt(data.io?.read ?? 0)}`));
-  grid.appendChild(ioCard);
-
-  // Network
-  const netCard = el('div', 'app-stat');
-  netCard.appendChild(el('div', 'app-stat-label', 'NETWORK'));
-  netCard.appendChild(el('div', 'app-stat-val', `↑ ${fmt(data.network?.tx ?? 0)}`));
-  netCard.appendChild(el('div', 'app-stat-sub', `↓ ${fmt(data.network?.rx ?? 0)}`));
-  grid.appendChild(netCard);
 
   wrap.appendChild(grid);
 

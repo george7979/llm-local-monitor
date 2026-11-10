@@ -59,7 +59,7 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama or llama.cpp, one a
 - `src/collectors/` — always return cached data (`cached('key', 2000, fn)`)
 - `src/collectors/ollama.js` — uses Ollama REST API (`/api/ps`), NOT SSH
 - `src/collectors/engineApps.js` — the single `app.query` per poll, with the pending TrueNAS jobs in the same ssh command (`getAppsAndJobs()`, cached 2 s; `getApps()` = its app list) and `getEngineState` (active engine, conflict, update flag); `getLaunchInfo` reads llama.cpp launch flags from `app.config` (cached 60 s)
-- `src/collectors/engineApp.js` — active engine app: state from `getApps()` + cgroup files over SSH (CPU/RAM/IO/Net)
+- `src/collectors/engineApp.js` — active engine app: state from `getApps()` + cgroup files over SSH (CPU/RAM)
 - `src/collectors/llamacpp.js` — llama-server HTTP (`/props`, `/v1/models`, `/slots`, `/metrics`); keeps the between-poll state, transitions in pure `advance()` of `src/lib/llamacppParse.js`
 - `src/lib/engine.js` — pure engine logic, no imports: `pickEngine`, `buildEngine`, `switchPlan`, `restartTarget`, `upgradeSkipList`, `modelsSource`, `annotateGpus`, `engineJobsPending` (TrueNAS jobs still WAITING/RUNNING, any `app.*` method, arguments naming an engine app by exact name), `statusBusy` (`engine.busy`); unit-tested
 - `src/lib/truenasJobs.js` — appends `core.get_jobs` to an `app.query` command (one ssh round trip; a failed job read does not fail the app list), parses the output, `refuseWhileEngineJobs` (409 pending job / 503 unreadable). Used by the three engine actions and `getAppsAndJobs()` → `engine.busy`
