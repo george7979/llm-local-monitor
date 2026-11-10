@@ -100,16 +100,18 @@ active engine's segment is highlighted.
   long model load or a crash at any time.
 - **Restart Ollama** becomes **Restart <engine>** and acts on the active engine
   in any state (RUNNING, DEPLOYING, CRASHED); disabled when none is active.
-- **Update all apps** never touches the inactive engine's app: upgrading a
-  stopped app may start it, which would put both engines on the same GPUs. The
-  inactive engine is updated after the owner switches to it. The button (and
+- **Update all apps** never touches an engine app that is not the active one
+  (both are left alone when none is active): upgrading a stopped app may start
+  it, which would put both engines on the same GPUs. An inactive engine is
+  updated after the owner switches to it. When the engine state cannot be read
+  the action refuses (HTTP 503) rather than upgrading everything. The button (and
   the app card's update badge) is enabled when the **active** engine's app has
   an update waiting — the v1.5.0 rule, applied to whichever engine is active:
   the engine needing an update is the occasion to sweep the other apps. Known
   consequence: a llama.cpp custom app pinned by image digest never reports an
   update, so with it active the button stays grey and other apps are updated
   from TrueNAS or while Ollama is active. The result line names the skipped
-  engine when it had an update pending.
+  apps that had an update pending.
 
 ### App card
 
@@ -285,7 +287,8 @@ not rendered and `switch-engine` returns 404.
 - File layout and names of new collectors and actions.
 - Visual styling of the switch and the header figures, within the existing
   look. If `LLAMA.CPP` wraps the badge row on a GPU card at the narrowest
-  supported width, shorten it to `LLAMA`.
+  supported width, shorten it to `LLAMA`. Decided: at 640 px and below the badge
+  reads `LLAMA`.
 - Cache keys and timeouts, following the existing collectors.
 
 ## Calls made by the author, not by the owner

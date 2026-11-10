@@ -139,8 +139,10 @@ Same two triggers, same gating on Ollama's flag — only the action widens. Olla
 needing an update is the occasion to sweep every other TrueNAS app that has one,
 so pending updates elsewhere on the host stop going unnoticed. Whichever apps the
 host happens to run are picked up as they are — nothing is named or configured.
-Monitoring stays Ollama-only by decision: the app list is read inside the action
-at click time, not by a polled collector.
+At v1.5.0 monitoring was Ollama-only by decision, and the app list was read inside
+the action at click time rather than by a polled collector. From v1.6.0 the gating
+follows the active engine and the polled `app.query` is shared; the action still
+reads the list fresh at click time.
 
 | # | Task | Status |
 |---|------|--------|
@@ -185,6 +187,34 @@ Rejected during design, recorded so it is not re-litigated:
 | 3 | Top-row cards get `min-width: 0` — a `1fr` track is `minmax(auto, 1fr)`, so any long nowrap label widened its column and ignored the ellipsis | ✅ Done |
 | 4 | Release: bump to v1.5.1, merge dev → main, GitHub release | ✅ Done |
 | 5 | Rebuild the Dockge stack on `#main` | ✅ Done — `/api/config` reports `1.5.1`, all 9 collectors error-free |
+
+---
+
+## Milestone: v1.6.0 — llama.cpp as an alternative engine
+
+**Status:** 🔄 Code on `dev`; owner acceptance on the live server open
+
+The dashboard follows whichever engine is active — Ollama or a llama.cpp server
+(`llama-server`) run as a second TrueNAS app — and a switch in the SERVER card moves
+the GPUs between them. Optional: without `LLAMACPP_APP_NAME` the dashboard behaves as
+v1.5.1. Update all apps skips every engine app that is not the active one.
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Engine selection from app state (`pickEngine`, conflict tie-break by GPU holder), per-GPU engine badge | ✅ Done |
+| 2 | llama-server collector: `/props`, `/v1/models`, `/slots`, `/metrics`; live and last-request speed, MTP %, context fill | ✅ Done |
+| 3 | `POST /api/switch-engine`, `POST /api/restart-engine`; engine-aware `/api/status`; renamed routes, no aliases | ✅ Done |
+| 4 | Update all apps skips non-active engine apps, refuses (503) when the engine state is unreadable | ✅ Done |
+| 5 | UI: engine switch, engine-titled app card with context fill and launch parameters, llama.cpp model card, `LLAMA` badge on narrow screens | ✅ Done |
+| 6 | Documentation (PRD, TECH, README, CLAUDE.md) | ✅ Done |
+| 7 | Acceptance: switch llama.cpp → Ollama — llama.cpp app STOPPED, Ollama RUNNING, cards and badges follow, Load / Unload work | ⬜ Open |
+| 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ⬜ Open |
+| 9 | Acceptance: during a generation live speed with ▶; after it dimmed last-request speed and MTP % | ⬜ Open |
+| 10 | Acceptance: with Ollama active and updates pending, Update all apps lights up and works as in v1.5.1; with llama.cpp active the button is grey; an update pending on the stopped engine is named as skipped and the app stays STOPPED | ⬜ Open |
+| 11 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
+
+Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
+Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
 
 ---
 

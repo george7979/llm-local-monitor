@@ -2,7 +2,7 @@
 
 **Stack:** Node 22-alpine, Express 5 ESM, vanilla HTML/CSS/JS
 **Deploy:** Docker container on Dockge host (`<DOCKGE_HOST>`) via Dockge
-**Target:** TrueNAS GPU server (`$LLM_HOST`) — GPU server running Ollama
+**Target:** TrueNAS GPU server (`$LLM_HOST`) — GPU server running Ollama or llama.cpp (one at a time)
 
 ---
 
@@ -13,16 +13,20 @@ Browser (local network)
   ↓ HTTP :3788 (HOST_PORT)
 Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── GET /api/config          → version, llmHost, truenasUrl, pollIntervalSec
-  ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive
+  ├── GET /api/status          → host + ipmi (parallel) + SSH collectors when alive; `engine`, `models`, `engineApp`
+  ├── GET /api/models-loaded   → active engine's loaded models (Ollama /api/ps or llama-server), null when no engine
+  ├── GET /api/engine-app      → active engine's app stats (llama.cpp adds `launch`), null when no engine
   ├── GET /api/gpu-procs       → SSH: nvidia-smi compute-apps + /proc/<pid>/cgroup + midclt app.query
   ├── GET /api/check-update    → GitHub API (cached 1h server-side)
-  ├── GET /api/models          → Ollama REST :11434/api/tags (installed on disk)
+  ├── GET /api/models          → Ollama REST :11434/api/tags (installed on disk); 409 with llama.cpp active
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
-  ├── POST /api/restart-ollama → SSH → midclt call app.stop/start
-  ├── POST /api/upgrade-apps   → SSH → midclt call app.query, then app.upgrade_bulk / app.pull_images
-  ├── POST /api/load-model     → Ollama REST /api/generate, keep_alive:-1
-  └── POST /api/unload-model   → Ollama REST /api/generate, keep_alive:0
+  ├── POST /api/switch-engine  → SSH → midclt app.stop other (awaited), 3 s, app.start target; body {"target":"ollama"|"llamacpp"}
+  ├── POST /api/restart-engine → SSH → midclt call app.stop/start on the active engine's app (409 when none)
+  ├── POST /api/upgrade-apps   → SSH → midclt call app.query, then app.upgrade_bulk / app.pull_images; skips non-active engine apps
+  ├── POST /api/load-model     → Ollama REST /api/generate, keep_alive:-1; 409 with llama.cpp active
+  ├── POST /api/unload-model   → Ollama REST /api/generate, keep_alive:0; 409 with llama.cpp active
+  └── (llama.cpp) GET :8080 /props /v1/models /slots /metrics   ← polled by the llamacpp collector
         ↓ SSH (ed25519, decoded from SSH_PRIVATE_KEY_B64)
   $LLM_HOST ($LLM_USER)
   ↓ TCP probe :443
@@ -42,8 +46,13 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | IPMI status | TCP probe port 443 on `$IPMI_HOST` | IPMI web interface responds even when server is powered off — availability signal independent from SSH/OS |
 | Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
-| Update-all UI triggers | Badge (OLLAMA APP card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by `ollamaApp.upgradeAvailable` (same greying pattern as Wake); `upgradeAllApps(msgId)` routes feedback to the calling card |
-| App list read in the action, not a collector | `upgradeApps()` calls `app.query` itself | Collectors are polled and cached; this answer must be fresh at click time, and monitoring stays deliberately Ollama-only — no extra SSH session per poll |
+| Update-all UI triggers | Badge (engine app card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by the active engine's update flag (`engine.updatesWaiting`; `engineApp.upgradeAvailable` when llama.cpp is not configured), same greying pattern as Wake; `upgradeAllApps(msgId)` routes feedback to the calling card |
+| App list read in the action | `upgradeApps()` calls `app.query` itself | The answer must be fresh at click time, not up to a poll interval old. Engine detection has its own polled `app.query` (`getApps()`, one per poll, cached 2 s, shared by every consumer) |
+| Active engine | From TrueNAS app state: an app not STOPPED is selected (RUNNING, DEPLOYING and CRASHED all count) | App state, not HTTP reachability: `llama-server` answers nothing useful while it downloads or loads a model, which can take an hour. Both selected = conflict: the engine whose app holds GPU processes wins, a tie goes to llama.cpp. Neither = none |
+| Engine matching on GPUs | By TrueNAS app name only (`gpuProcs` `container`), never by binary name | Ollama runs its own `llama-server` binary inside its container |
+| Update all apps vs engine apps | Every engine app that is not the active one is skipped (both when none is active) | Upgrading a stopped app may start it, putting both engines on the same GPUs. Unreadable engine state (llama.cpp configured) → HTTP 503, nothing is upgraded. The result names skipped apps that had an update pending. Not configured → nothing skipped, as v1.5.1 |
+| Switching engines | `switchEngine`: fresh `app.query`, stop other (`midclt call -j`, 120 s), 3 s, start target if STOPPED | Fresh read, not the 2 s cache. `switching` is an in-memory flag held only while the commands run; the target reaching RUNNING in the regular poll is the success signal. No rollback; a target that fails to start shows as the active engine in CRASHED |
+| Digest-pinned llama.cpp image | Never reports an update | With llama.cpp active the update button stays grey; other apps are updated from TrueNAS or while Ollama is active |
 | Two upgrade paths | `app.upgrade_bulk` for charts, `app.pull_images` for image-only | `upgrade_available` is a chart bump and pulls new images with it; `image_updates_available` alone is a fresher tag on the same chart, which `app.upgrade` does not handle. There is no bulk form of `pull_images` |
 | `snapshot_hostpaths` left off | Default `false`, as before | Only `ollama` uses `host_path` (463 GB of model blobs on `nvme_pcie`, 303 GB free); ZFS snapshots are free at creation but pin freed blocks afterwards, and nothing here prunes them. The apps with real config-migration risk sit on `ix_volume`, which the option does not cover. `app.rollback` remains the tool for a broken upgrade |
 | GPU process names | PID → `/proc/<pid>/cgroup` → `midclt call app.query` on host | nvidia-smi reports only binary paths; TrueNAS app name (e.g. `ollama`) is the meaningful label; `docker ps` not accessible to `truenas_admin`; single SSH round-trip keeps it atomic |
@@ -112,6 +121,8 @@ Copy `.env.example` → `.env` and fill in:
 | `PORT` | Internal container port — must match Dockerfile EXPOSE (default: 3000) | optional |
 | `OLLAMA_BASE_URL` | Ollama API URL (default: `http://$LLM_HOST:11434`) | optional |
 | `OLLAMA_APP_NAME` | TrueNAS App name for Ollama (default: `ollama`) | optional |
+| `LLAMACPP_APP_NAME` | TrueNAS App name of the llama.cpp server. Unset = llama.cpp support off (dashboard behaves as Ollama-only) | optional |
+| `LLAMACPP_BASE_URL` | llama-server URL (default: `http://$LLM_HOST:8080`) | optional |
 | `POLL_INTERVAL_SEC` | Polling interval in seconds (default: 5) | optional |
 | `IPMI_INTERFACE` | ipmitool interface (default: `lanplus`, use `lan` for IPMI v1.5) | optional |
 | `WAKE_CMD` | Custom wake command — overrides ipmitool default | optional |
@@ -215,17 +226,22 @@ curl http://localhost:3788/healthz
 curl http://localhost:3788/api/status | python3 -m json.tool
 
 # Individual panels
-curl http://localhost:3788/api/ollama
+curl http://localhost:3788/api/models-loaded
 curl http://localhost:3788/api/gpu
 curl http://localhost:3788/api/gpu-procs
 curl http://localhost:3788/api/memory
-curl http://localhost:3788/api/ollama-app
-curl http://localhost:3788/api/models
+curl http://localhost:3788/api/engine-app
+curl http://localhost:3788/api/models        # Ollama only
 
 # Action test (be careful!)
 curl -X POST http://localhost:3788/api/wake
 
-# Model actions — unload is instant, load can take minutes
+# Engine actions move the GPUs on the live server — only with the owner's go-ahead
+curl -X POST http://localhost:3788/api/switch-engine \
+  -H 'Content-Type: application/json' -d '{"target":"llamacpp"}'   # or "ollama"
+curl -X POST http://localhost:3788/api/restart-engine
+
+# Model actions (Ollama only) — unload is instant, load can take minutes
 curl -X POST http://localhost:3788/api/unload-model \
   -H 'Content-Type: application/json' -d '{"model":"<name>"}'
 time curl -X POST http://localhost:3788/api/load-model \
@@ -241,7 +257,11 @@ npm test
 ```
 
 Runs Node's built-in test runner over `test/`. Coverage is deliberately limited to pure
-functions — `mapTags` and `findModel` in `src/collectors/ollamaModels.js`. Everything that
+functions — `mapTags` and `findModel` in `src/collectors/ollamaModels.js`, the engine logic in
+`src/lib/engine.js` (active engine, GPU badge, switch plan, pending-update selection), the
+llama-server parsing in `src/lib/llamacppParse.js` (metrics text, model row, speed, MTP, context
+fill, launch parameters, the between-poll `advance()` state machine) and `switchEngine` with an
+injected executor. Everything that
 touches HTTP, SSH or the DOM is verified manually with the curl commands above and in the
 browser; `public/app.js` is a classic script, not an ES module, so a runner cannot import it.
 
@@ -273,6 +293,45 @@ Every 6h     → /api/check-update → server (GitHub or 1h cache)
 
 ---
 
+## llama.cpp engine
+
+Enabled by `LLAMACPP_APP_NAME`. `llama-server` must run with `--metrics`; `/slots` is on by default.
+No API key is used (authenticated llama-server is not supported).
+
+### Payloads (field paths)
+
+- `GET /health` → `{"status":"ok"}` when ready (not used for engine detection)
+- `GET /props` → `model_alias`, `model_ftype` (quantization, e.g. `Q8_0`), `total_slots`, `default_generation_settings.n_ctx`
+- `GET /v1/models` → `data[0].id` (alias), `data[0].meta.n_params` (integer, shown as `26.9B`), `data[0].meta.n_ctx`, `data[0].meta.ftype`
+- `GET /slots` → array of `{ id, n_ctx, is_processing, id_task, n_prompt_tokens, n_prompt_tokens_cache, next_token: [ { n_decoded, n_remain, has_next_token } ] }`
+- `GET /metrics` → Prometheus text, prefix `llamacpp:` — `tokens_predicted_total`, `tokens_predicted_seconds_total`, `prompt_tokens_total`, `prompt_seconds_total`, `requests_processing`, `spec_decode_num_draft_tokens_total`, `spec_decode_num_accepted_tokens_total`. Values may be in scientific notation (`3.91362e+06`)
+
+### Counters move only when a request finishes
+
+`/metrics` counters change only when a request finishes; `/slots` → `next_token.n_decoded` grows during generation. So:
+
+- **Live speed** (shown with ▶): change in `n_decoded` ÷ wall-clock time between two consecutive samples of the same `id_task`. While a slot is processing but nothing is decoded yet the card reads "reading prompt…"
+- **Idle speed**: dimmed, from the change in `tokens_predicted_total` ÷ `tokens_predicted_seconds_total` at the moment the counters last moved; until a finished request has been seen, the ratio over the counters' lifetime
+- **MTP %**: `spec_decode_num_accepted_tokens_total` ÷ `spec_decode_num_draft_tokens_total`, same window as idle speed; hidden when the draft counter is absent or zero
+- Between-poll state lives in the collector (`llamacpp.js`); the transitions are the pure `advance()` in `llamacppParse.js`, reset whenever the server stops answering
+
+### Cards
+
+- **Model row**: alias, parameters, quantization, context from `/props` + `/v1/models`; VRAM = sum of GPU memory held by the llama.cpp app's container (from the `gpuProcs` list). Server not ready → one dimmed "Loading model…" row. Columns Processor / Expires / actions are dropped and **Models…** hidden
+- **App card**: same container stats as Ollama (read from the active app), plus context fill per slot (idle slot keeps the last fill) and the launch parameters from `midclt call app.config <app>` (service `command`, cached 60 s). Only recognised flags are interpreted — split mode, speculative decoding type and draft length, slots, threads, KV cache quantization, batch sizes, reasoning budget; the full command is the block's tooltip
+- **GPU badge**: `OLLAMA` / `LLAMA.CPP` per GPU, by the app that has a process on it; at 640 px and below the badge reads `LLAMA`
+- **No engine active**: the model card reads "No engine running", the app card lists both apps as stopped; either side of the switch starts that engine. **Conflict** shows "Both engines are running — pick one" in the SERVER card
+
+### `/api/status` shape
+
+`ollama` → `models`, `ollamaApp` → `engineApp`, per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). `engine` is `{ active, switching, conflict, enabled, notFound, updatesWaiting, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`, plus `error` when the app list could not be read. With llama.cpp active `models` also carries `speed`, `mtp`, `activity`, `loading` and `slots`. Unconfigured: `engine.apps` has only `ollama`, the switch is not rendered and `switch-engine` returns 404. Renamed routes have no aliases.
+
+### Switch endpoint
+
+`POST /api/switch-engine` `{ "target": "ollama" | "llamacpp" }` — 404 when llama.cpp is not configured or an engine app is missing, 400 unknown target, 409 switch already running, 503 host down. Target already the only engine not STOPPED → `{ok:true, noop:true}`. A stop/start error → 500; the dashboard shows whatever the apps then report.
+
+---
+
 ## Troubleshooting
 
 | Problem | Diagnosis | Solution |
@@ -283,7 +342,9 @@ Every 6h     → /api/check-update → server (GitHub or 1h cache)
 | nvidia-smi: not found | No NVIDIA driver on host | Check: `ssh $LLM_USER@$LLM_HOST which nvidia-smi` |
 | ipmitool error | Wrong `IPMI_HOST`, user or password | Test: `ipmitool -I lanplus -H $IPMI_HOST -U $IPMI_USER -P $IPMI_PASS chassis status` |
 | Memory arc = 0 | `/proc/spl/kstat/zfs/arcstats` unavailable | Check: `ssh $LLM_USER@$LLM_HOST lsmod \| grep zfs` |
-| ollamaApp: parse error | `midclt` not installed or no permissions | Test: `ssh $LLM_USER@$LLM_HOST midclt call core.ping` |
+| llama.cpp card shows `—` for speed / MTP | `llama-server` started without `--metrics` | Add `--metrics` to the app's command; `/slots` must also be enabled (it is by default) |
+| llama.cpp model row stuck on "Loading model…" | `/props` or `/v1/models` not answering yet (model still loading) or `LLAMACPP_BASE_URL` wrong | Check: `curl http://$LLM_HOST:8080/health` — `{"status":"ok"}` when ready |
+| Engine app card: parse error | `midclt` not installed or no permissions | Test: `ssh $LLM_USER@$LLM_HOST midclt call core.ping` |
 | A model fails instantly with `option "stop" must be of type array` | Its stored parameters keep `stop` as a scalar; Ollama 0.32 requires an array | Rebuild the manifest — see _Repairing a model rejected by parameter validation_ |
 
 ### Repairing a model rejected by parameter validation

@@ -1,13 +1,14 @@
 # llm-local-monitor
 
-Dashboard for monitoring a local LLM server running **TrueNAS CE** with GPU cards and Ollama.
+Dashboard for monitoring a local LLM server running **TrueNAS CE** with GPU cards and Ollama or llama.cpp.
 
 ### Target stack
 
 | Component | Role |
 |-----------|------|
-| **TrueNAS CE** (`$LLM_HOST`) | GPU server — hosts Ollama as a TrueNAS App (Docker container) |
+| **TrueNAS CE** (`$LLM_HOST`) | GPU server — hosts Ollama (and optionally llama.cpp) as TrueNAS Apps (Docker containers) |
 | **Ollama** | Framework for running local LLM models (llama, qwen, gemma, etc.) |
+| **llama.cpp** (optional) | `llama-server` as a second TrueNAS App — an alternative engine; never run together with Ollama |
 | **IPMI/BMC** (`$IPMI_HOST`) | Remote power management (wake/shutdown) |
 | **Dockge** (`<DOCKGE_HOST>`) | Docker orchestrator — this monitor runs here |
 
@@ -38,15 +39,47 @@ from TrueNAS — `ollama` and whatever else happens to be sharing the card.
 - **Live** — the list refreshes with the dashboard polling while open
 - Close with ✕, a click outside, or `Esc`; cards also work with the keyboard (`Tab` + `Enter`)
 
-The `OLLAMA` badge on the cards still shows at a glance where Ollama lives — the modal is for
-the full picture.
+The `OLLAMA` / `LLAMA.CPP` badge on the cards shows at a glance which engine holds each GPU
+(`LLAMA` on narrow screens) — the modal is for the full picture.
+
+## Ollama or llama.cpp
+
+With llama.cpp configured (see below), the dashboard follows whichever engine is running and
+a two-segment switch `Ollama | llama.cpp` in the **Server** card moves the GPUs from one to
+the other: it stops the other engine's app, waits 3 s, then starts the chosen one. The two are
+never meant to run together; if both are, the card says "Both engines are running — pick one"
+and choosing either side resolves it.
+
+With llama.cpp active:
+
+- **Loaded models** shows the model (alias, parameters, quantization, VRAM, context) and, in
+  the header, the generation speed — live with ▶ while generating, dimmed (last finished
+  request) when idle — and the MTP draft acceptance rate. Load / Unload / **Models…** are
+  Ollama features and are hidden.
+- **Llama.cpp App** adds context fill per slot and the server's launch parameters, read from
+  the app's TrueNAS configuration.
+- **Restart <engine>** acts on whichever engine is active.
+- **Update all apps** upgrades every app with an update waiting except engine apps that are not
+  the active one (upgrading a stopped app could start it). It is enabled by the *active*
+  engine's update flag; a llama.cpp app pinned by image digest never reports one, so with it
+  active the button stays grey.
+
+### Configuration
+
+```env
+LLAMACPP_APP_NAME=llama-cpp                # TrueNAS app name; unset = llama.cpp support off
+# LLAMACPP_BASE_URL=http://<LLM_HOST>:8080 # default
+```
+
+Start `llama-server` with `--metrics` (and leave `/slots` enabled, the default); without them
+speed and MTP show `—`. Without `LLAMACPP_APP_NAME` the dashboard is Ollama-only.
 
 ## Managing what sits in VRAM
 
 The **Loaded models** panel both reports residency and changes it.
 
 - **Unload** next to any resident model frees its VRAM without touching the others — a precise
-  alternative to *Restart Ollama*, which drops everything at once.
+  alternative to *Restart Ollama*, which drops everything at once. (Ollama only; with llama.cpp active the model lives as long as its container.)
 - **Models…** opens the catalog of everything installed on the server, with a name filter and
   a **Load** button per model. Models already in memory are marked and offer *Unload* there
   too, so making room and loading something else takes one visit.
@@ -74,12 +107,12 @@ the counter picks up where it was.
 
 | Panel | Shows | Data source |
 |-------|-------|-------------|
-| **Server** | Alive/Offline + Wake/Shut down/Restart Ollama/Update all apps | TCP probe, IPMI |
+| **Server** | Alive/Offline + engine switch (llama.cpp configured) + Wake/Shut down/Restart engine/Update all apps | TCP probe, IPMI, `midclt` |
 | **RAM** | Free / ZFS ARC / Services (donut chart) | SSH → `/proc/meminfo` + ZFS arcstats |
 | **LAN Ports** | Per-port RX/TX histogram (Mbit/s), dynamic scale, host bridge summary | SSH → `/proc/net/dev` + `/sys/class/net/<iface>/speed` |
-| **Ollama App** | Status, CPU%, RAM, Block I/O, Network | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
-| **Loaded models** | Model, size, quant, GPU/CPU split, context + per-model **Unload**; **Models…** opens a browser of everything installed, with filter and one-click load | Ollama REST API `:11434/api/ps` and `/api/tags` |
-| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + OLLAMA badge; click a card → per-process modal with app names | SSH → `nvidia-smi` + `/proc/<pid>/cgroup` + `midclt` |
+| **Ollama App** / **Llama.cpp App** | Status, CPU%, RAM, Block I/O, Network (llama.cpp: + context fill, launch parameters) | SSH → cgroup `/sys/fs/cgroup/docker/<id>/` + `midclt` |
+| **Loaded models** | Ollama: model, size, quant, GPU/CPU split, context + per-model **Unload**; **Models…** opens a browser of everything installed, with filter and one-click load. llama.cpp: model row + speed and MTP % | Ollama REST API `:11434/api/ps` and `/api/tags`; llama-server `/props`, `/v1/models`, `/slots`, `/metrics` |
+| **GPU** | Util%, VRAM, temp, power (6× RTX A2000) + engine badge; click a card → per-process modal with app names | SSH → `nvidia-smi` + `/proc/<pid>/cgroup` + `midclt` |
 
 ---
 
