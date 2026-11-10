@@ -5,13 +5,15 @@ import { engineJobsPending } from './engine.js';
 export const JOBS_MARKER = '--- core.get_jobs ---';
 export const JOBS_FAILED = '--- core.get_jobs failed ---';
 
-// Filtered by state only; the method filter lives in engineJobsPending().
-const PENDING_JOBS = `midclt call core.get_jobs '[["state","in",["WAITING","RUNNING"]]]' '{"select":["id","method","state","arguments"]}'`;
+// Filtered by state only; the method filter lives in engineJobsPending(). Capped
+// at 5 s so a hanging job read degrades only the job list, not the app list
+// sharing the ssh command (whose own timeout is 10 s on the poll).
+const PENDING_JOBS = `timeout 5 midclt call core.get_jobs '[["state","in",["WAITING","RUNNING"]]]' '{"select":["id","method","state","arguments"]}'`;
 
 /**
  * `appQuery` followed by the pending-job read. A failed `app.query` still
- * fails the whole command; a failed job read prints JOBS_FAILED instead, so
- * the app list survives it.
+ * fails the whole command; a failed or timed-out job read prints JOBS_FAILED
+ * instead, so the app list survives it (the actions then refuse with 503).
  */
 export const withPendingJobs = appQuery =>
   `${appQuery} && echo '${JOBS_MARKER}' && { ${PENDING_JOBS} || echo '${JOBS_FAILED}'; }`;

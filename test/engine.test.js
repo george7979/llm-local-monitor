@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList, modelsSource, engineJobsPending } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList, modelsSource, engineJobsPending, statusBusy } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -212,18 +212,21 @@ test('engineJobsPending: every argument shape names the app', () => {
   ]);
 });
 
-test('engineJobsPending: every listed method counts', () => {
-  for (const m of ['app.start', 'app.stop', 'app.redeploy', 'app.update', 'app.upgrade', 'app.upgrade_bulk',
-    'app.pull_images', 'app.rollback', 'app.delete']) {
+test('engineJobsPending: any app.* method counts, no allow-list', () => {
+  for (const m of ['app.restart', 'app.start', 'app.something_new']) {
     assert.equal(engineJobsPending([job(m, ['ollama'])], N).length, 1, m);
   }
+  // not an app.* method, though it names an engine app
+  assert.deepEqual(engineJobsPending([job('docker.update', ['ollama'])], N), []);
+  assert.deepEqual(engineJobsPending([job('application.start', ['ollama'])], N), []);
+  // an app.* method naming no app
+  assert.deepEqual(engineJobsPending([job('app.metadata.generate', [])], N), []);
 });
 
 test('engineJobsPending: finished jobs, other apps and other methods are ignored', () => {
   for (const s of ['SUCCESS', 'FAILED', 'ABORTED']) assert.deepEqual(engineJobsPending([job('app.start', ['ollama'], s)], N), []);
   assert.deepEqual(engineJobsPending([job('app.start', ['app-a'])], N), []);
-  assert.deepEqual(engineJobsPending([job('app.metadata.generate', ['ollama'])], N), []);
-  assert.deepEqual(engineJobsPending([job('app.query', ['ollama'])], N), []);
+  assert.deepEqual(engineJobsPending([job('pool.scrub', ['ollama'])], N), []);
 });
 
 test('engineJobsPending: exact names only, never a substring', () => {
@@ -259,4 +262,14 @@ test('buildEngine: busy is passed through, null by default, also without a state
   assert.equal(buildEngine(state, { configured: true, switching: false }).busy, null);
   assert.deepEqual(buildEngine({ error: 'boom' }, { configured: false, switching: false, busy }).busy, busy);
   assert.equal(buildEngine(null, { configured: true, switching: false }).busy, null);
+});
+
+test('statusBusy: first pending engine job, null when the job or app read failed', () => {
+  const jobs = [job('app.start', ['app-a'], 'RUNNING', 1), job('app.upgrade', ['ollama'], 'RUNNING', 2), job('app.stop', ['llama-cpp'], 'RUNNING', 3)];
+  assert.deepEqual(statusBusy({ apps: [], jobs, jobsError: null }, state, N), { app: 'ollama', method: 'app.upgrade' });
+  assert.equal(statusBusy({ apps: [], jobs: [], jobsError: null }, state, N), null);
+  assert.equal(statusBusy({ apps: [], jobs: null, jobsError: 'core.get_jobs failed' }, state, N), null);
+  assert.equal(statusBusy({ error: 'ssh down' }, { error: 'ssh down' }, N), null);
+  assert.equal(statusBusy({ apps: [], jobs, jobsError: null }, { error: 'bad state' }, N), null);
+  assert.equal(statusBusy(null, state, N), null);
 });

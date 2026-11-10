@@ -83,9 +83,6 @@ export function buildEngine(state, { configured, switching, action = null, busy 
   return { ...state, apps, switching, action, busy, enabled: configured && !!state.apps.llamacpp };
 }
 
-// TrueNAS job methods that can start, stop or redeploy an app.
-const APP_JOB_METHODS = new Set(['app.start', 'app.stop', 'app.redeploy', 'app.update', 'app.upgrade',
-  'app.upgrade_bulk', 'app.pull_images', 'app.rollback', 'app.delete']);
 const JOB_PENDING_STATES = new Set(['WAITING', 'RUNNING']);
 
 /** The engine app a job argument names: a string, an object's `app_name`, or either inside (nested) arrays. */
@@ -103,9 +100,11 @@ function argumentApp(arg, wanted) {
 }
 
 /**
- * TrueNAS jobs (`core.get_jobs` rows) still WAITING or RUNNING that act on an
- * engine app — while one runs, it can start an engine behind a switch's back.
- * Exact app-name equality only; object values other than `app_name` are not
+ * TrueNAS jobs (`core.get_jobs` rows) still WAITING or RUNNING whose method is
+ * any `app.*` one and whose arguments name an engine app — while one runs, it
+ * can start an engine behind a switch's back. No allow-list of methods: one
+ * missed (e.g. `app.restart`, stop then start) would let a switch see the app
+ * STOPPED mid-job. Exact app-name equality only; object values other than `app_name` are not
  * searched (an `app.update` carries the whole compose config). `names` =
  * `{ ollama, llamacpp }`, llamacpp may be null. Malformed rows are ignored.
  */
@@ -114,7 +113,7 @@ export function engineJobsPending(jobs, names) {
   const wanted = new Set([names.ollama, names.llamacpp].filter(n => typeof n === 'string' && n));
   const pending = [];
   for (const job of jobs) {
-    if (!job || !JOB_PENDING_STATES.has(job.state) || !APP_JOB_METHODS.has(job.method) || !Array.isArray(job.arguments)) continue;
+    if (!job || !JOB_PENDING_STATES.has(job.state) || typeof job.method !== 'string' || !job.method.startsWith('app.') || !Array.isArray(job.arguments)) continue;
     const app = argumentApp(job.arguments, wanted);
     if (app) pending.push({ id: job.id, method: job.method, app });
   }
@@ -215,4 +214,16 @@ export function switchPlan(apps, target, names) {
   const stop = otherState !== 'STOPPED' ? otherName : null;
   const start = targetState === 'STOPPED' ? targetName : null;
   return { missing: false, stopping: false, stop, start, noop: !stop && !start };
+}
+
+/**
+ * `engine.busy` of /api/status: the first TrueNAS job still running on an
+ * engine app as `{ app, method }`. Null when there is none, when the job list
+ * could not be read (`read.jobsError`), or when the app read or the engine
+ * state carries an error — the actions still fail closed on their own read.
+ */
+export function statusBusy(read, state, names) {
+  if (!read || read.error || read.jobsError || state?.error) return null;
+  const [job] = engineJobsPending(read.jobs, names);
+  return job ? { app: job.app, method: job.method } : null;
 }

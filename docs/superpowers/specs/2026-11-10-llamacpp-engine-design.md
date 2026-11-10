@@ -223,13 +223,12 @@ already keeps its previous sample.
 1. Reject if the host is down, the target is unknown, the feature is off, or
    another engine action (switch, restart, Update all apps) is running
    (HTTP 409). Under the lock, read the engine app states and the TrueNAS jobs
-   still WAITING or RUNNING in one ssh round trip. A job that can start, stop
-   or redeploy an engine app (`app.start`, `app.stop`, `app.redeploy`,
-   `app.update`, `app.upgrade`, `app.upgrade_bulk`, `app.pull_images`,
-   `app.rollback`, `app.delete`, matched by exact app name in its arguments)
-   refuses the switch (HTTP 409, "TrueNAS is still working on <app> (<method>)
+   still WAITING or RUNNING in one ssh round trip. Any `app.*` job whose
+   arguments name an engine app (exact app name; no list of methods, so
+   `app.restart` and methods added later count too) refuses the switch (HTTP 409, "TrueNAS is still working on <app> (<method>)
    — try again when it finishes"); a read that fails (ssh included) or a job
-   list that cannot be parsed refuses it with HTTP 503. The target app still STOPPING is refused too (HTTP 409,
+   list that cannot be read within 5 s refuses it with HTTP 503. The target
+   app still STOPPING is refused too (HTTP 409,
    "<App> is still stopping — try again in a moment"): it would finish stopping
    after the switch and leave no engine.
 2. Stop the other engine's app if it is not STOPPED; wait for the stop job.
@@ -241,9 +240,11 @@ already keeps its previous sample.
 
 `engine.switching` reports the in-memory engine-action lock (`engine.action`
 names its holder: switch, restart or upgrade); for a switch it is held from the
-fresh state read through step 5. Restart makes the same TrueNAS-job check
-under the lock (only the Ollama app with llama.cpp unset), and so does Update
-all apps with llama.cpp configured.
+fresh state read through step 5. It is not persisted and has no timeout of its
+own beyond the SSH command's; a monitor restart clears it, and the next poll
+shows the real app states. Restart makes the same TrueNAS-job check under the
+lock (only the Ollama app with llama.cpp unset), and so does Update all apps
+with llama.cpp configured.
 
 `engine.busy` reports a TrueNAS job still running on an engine app as
 `{ app, method }` (null when none, or when the job list could not be read — the
@@ -251,9 +252,8 @@ actions still fail closed on their own fresh read). It comes from the polled
 app list's ssh command, so the poll gains no round trip, and it covers jobs
 started outside the monitor (the TrueNAS UI, the upgrade jobs Update all apps
 leaves running). While it is set the UI disables the switch, Restart, Update
-all apps and the update badge.
-It is not persisted and has no timeout of its own beyond the SSH command's; a
-monitor restart clears it, and the next poll shows the real app states.
+all apps and the update badge. A job read that fails or takes over 5 s only
+sets `busy` to null; the app list of the same poll is unaffected.
 
 If the target is already the only engine not STOPPED, the call is a no-op.
 If a stop or start command errors, the call returns 500 and the dashboard shows

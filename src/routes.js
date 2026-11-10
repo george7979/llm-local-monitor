@@ -20,7 +20,7 @@ import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
-import { appVramBytes, buildEngine, engineAppName, annotateGpus, modelsSource, engineJobsPending } from './lib/engine.js';
+import { appVramBytes, buildEngine, engineAppName, annotateGpus, modelsSource, statusBusy } from './lib/engine.js';
 import { engineAction } from './lib/engineLock.js';
 
 export const router = Router();
@@ -45,11 +45,6 @@ const appNameOf = engine => engineAppName(engine, engineNames(), !!engine.enable
  */
 const engineOpts = (busy = null) => ({ configured: !!cfg.llamacppAppName, switching: !!engineAction(), action: engineAction(), busy });
 
-function busyFrom(jobs) {
-  const [job] = engineJobsPending(jobs ?? [], engineNames());
-  return job ? { app: job.app, method: job.method } : null;
-}
-
 /**
  * The GPU process list and the app list (with the pending TrueNAS jobs, same
  * ssh command) are read in parallel; the engine state needs both (the
@@ -63,7 +58,7 @@ function readEngine() {
   const engine = Promise.all([gpuProcs, read]).then(async ([g, r]) => {
     const procs = g.procs ?? [];
     const state = r.error ? r : await safeCollect(() => getEngineState(procs, r.apps));
-    return { engine: buildEngine(state, engineOpts(r.error ? null : busyFrom(r.jobs))), procs };
+    return { engine: buildEngine(state, engineOpts(statusBusy(r, state, engineNames()))), procs };
   });
   return { gpuProcs, engine };
 }

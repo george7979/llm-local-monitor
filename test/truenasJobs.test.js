@@ -9,6 +9,8 @@ test('withPendingJobs: one command, a failed job read does not fail the app read
   const cmd = withPendingJobs("midclt call app.query '[]'");
   assert.match(cmd, /^midclt call app\.query '\[\]' && echo /);
   assert.match(cmd, /core\.get_jobs '\[\["state","in",\["WAITING","RUNNING"\]\]\]'/);
+  // a hanging job read is cut short and reported as failed, not as an ssh timeout of the whole poll
+  assert.match(cmd, /\{ timeout 5 midclt call core\.get_jobs .* \|\| echo /);
   assert.match(cmd, /\|\| echo /);
   // filtered by state only: no app method in the read itself
   assert.doesNotMatch(cmd, /app\.(start|stop|upgrade)/);
