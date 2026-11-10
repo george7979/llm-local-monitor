@@ -194,6 +194,16 @@ Rejected during design, recorded so it is not re-litigated:
 
 **Status:** 🔄 Code on `dev`; owner acceptance on the live server open
 
+**Current step.** The owner is testing the `#dev` build on the production
+dashboard (the Dockge stack builds `#dev`, see item 15) and will come back with
+remarks. Work resumes from those remarks; after them, the acceptance items
+below (7–13a), then the release (14–15). The engine app card was reshaped during
+this review: no Block I/O / Network, and `KEY  value` entries in two columns
+instead of CPU/RAM tiles. Nobody has yet run a real switch, restart or Update
+all apps from the dashboard — the first real one is part of the acceptance.
+Development rule: no switch or restart of the engine on the live server without
+the owner's go-ahead (`CLAUDE.md`).
+
 The dashboard follows whichever engine is active — Ollama or a llama.cpp server
 (`llama-server`) run as a second TrueNAS app — and a switch in the SERVER card moves
 the GPUs between them. Optional: without `LLAMACPP_APP_NAME` the dashboard behaves as
@@ -205,7 +215,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 2 | llama-server collector: `/props`, `/v1/models`, `/slots`, `/metrics`; live and last-request speed, MTP %, context fill | ✅ Done |
 | 3 | `POST /api/switch-engine`, `POST /api/restart-engine`; engine-aware `/api/status`; renamed routes, no aliases | ✅ Done |
 | 4 | Update all apps skips non-active engine apps, refuses (503) when the engine state is unreadable | ✅ Done |
-| 5 | UI: engine switch, engine-titled app card with context fill and launch parameters, llama.cpp model card, `LLAMA` badge on narrow screens | ✅ Done |
+| 5 | UI: engine switch, engine-titled app card (two columns of entries: context, CPU, RAM, slots, threads / split, MTP, KV, batch, reasoning), llama.cpp model card, `LLAMA` badge on narrow screens | ✅ Done |
 | 6 | Documentation (PRD, TECH, README, CLAUDE.md) | ✅ Done |
 | 7 | Acceptance: switch llama.cpp → Ollama — llama.cpp app STOPPED, Ollama RUNNING, cards and badges follow, Load / Unload work | ⬜ Open |
 | 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ⬜ Open |

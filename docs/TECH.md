@@ -215,7 +215,7 @@ Click **Deploy**. Dashboard: `http://<DOCKGE_HOST>:3788`
 
 ### Updating after code changes
 
-In Dockge: **Restart** — `no_cache: true` + `pull_policy: build` pulls fresh code from GitHub.
+In Dockge: **Update** (not Restart) — it ends in `compose up -d`, where `no_cache: true` + `pull_policy: build` rebuild the image from fresh GitHub code. Restart only restarts the existing container.
 
 ---
 
@@ -322,7 +322,7 @@ No API key is used (authenticated llama-server is not supported).
 ### Cards
 
 - **Model row**: alias, parameters, quantization, context from `/props` + `/v1/models`; VRAM = sum of GPU memory held by the llama.cpp app's container (from the `gpuProcs` list). Server not ready → one dimmed "Loading model…" row while the app is RUNNING or DEPLOYING, otherwise "Not running (<STATE>)". Columns Processor / Expires / actions are dropped and **Models…** hidden
-- **App card**: same container stats as Ollama (read from the active app), plus context fill per slot (idle slot keeps the last fill) and the launch parameters from `midclt call app.config <app>` (service `command`, cached 60 s). Only recognised flags are interpreted — split mode, speculative decoding (`MTP ×n` for MTP types, `spec <type> ×n` for others, nothing for `none`), slots, threads, KV cache quantization, batch sizes, reasoning budget; the full command is the block's tooltip
+- **App card**: CPU and RAM of the active app's container, plus context fill per slot (idle slot keeps the last fill) and the launch parameters from `midclt call app.config <app>` (service `command`, cached 60 s). Only recognised flags are interpreted — split mode, speculative decoding (`MTP ×n` for MTP types, `spec <type> ×n` for others, nothing for `none`), slots, threads, KV cache quantization, batch sizes, reasoning budget; the full command is the block's tooltip
 - **GPU badge**: `OLLAMA` / `LLAMA.CPP` per GPU, by the app that has a process on it; at 640 px and below the badge reads `LLAMA`
 - **No engine active**: the model card reads "No engine running", the app card lists both apps as stopped; either side of the switch starts that engine. **Conflict** shows "Both engines are running — pick one" in the SERVER card
 
