@@ -21,22 +21,22 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
  * is taken before the first await, so two simultaneous requests cannot both
  * get in.
  */
-export async function switchEngine(target) {
+export async function switchEngine(target, exec = sshExec) {
   if (switching) throw fail(409, 'Switch already in progress');
   switching = true;
   try {
     const names = { ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName };
     const filter = JSON.stringify([['name', 'in', [names.ollama, names.llamacpp]]]);
-    const raw = await sshExec(`midclt call app.query '${filter}' '{"select":["name","state"]}'`);
+    const raw = await exec(`midclt call app.query '${filter}' '{"select":["name","state"]}'`);
     const plan = switchPlan(JSON.parse(raw), target, names);
-    if (plan.missing) throw fail(404, `App not found: ${names[target]}`);
+    if (plan.missing) throw fail(404, 'Both engine apps must exist to switch');
     if (plan.noop) return { ok: true, target, noop: true };
 
     if (plan.stop) {
-      await sshExec(`midclt call -j app.stop '${plan.stop}' > /dev/null`, STOP_TIMEOUT_MS);
+      await exec(`midclt call -j app.stop '${plan.stop}' > /dev/null`, STOP_TIMEOUT_MS);
       await new Promise(r => setTimeout(r, GPU_RELEASE_MS));
     }
-    if (plan.start) await sshExec(`midclt call app.start '${plan.start}' > /dev/null`);
+    if (plan.start) await exec(`midclt call app.start '${plan.start}' > /dev/null`);
     return { ok: true, target, noop: false };
   } finally {
     switching = false;

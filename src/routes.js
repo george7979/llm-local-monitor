@@ -20,7 +20,7 @@ import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
-import { appVramBytes, buildEngine, skipNameFor, annotateGpus } from './lib/engine.js';
+import { appVramBytes, buildEngine, skipListFor, engineAppName, annotateGpus } from './lib/engine.js';
 
 export const router = Router();
 
@@ -33,7 +33,7 @@ function safeCollect(fn) {
 }
 
 const engineNames = () => ({ ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName });
-const appNameOf = engine => (engine.active === 'llamacpp' ? cfg.llamacppAppName : engine.active === 'ollama' ? cfg.ollamaAppName : null);
+const appNameOf = engine => engineAppName(engine, engineNames(), !!cfg.llamacppAppName);
 
 /**
  * GPU holders first, then engine state: the conflict tie-break needs the
@@ -180,7 +180,10 @@ router.post('/switch-engine', async (req, res) => {
 router.post('/upgrade-apps', async (_req, res) => {
   try {
     const { engine } = await readEngine().engine;
-    res.json(await upgradeApps(skipNameFor(engine, engineNames())));
+    const configured = !!cfg.llamacppAppName;
+    // Fail closed: without a known active engine we cannot tell which app is safe to touch.
+    if (configured && engine.error) return res.status(503).json({ error: `Cannot determine the active engine: ${engine.error}` });
+    res.json(await upgradeApps(skipListFor(engine, engineNames(), configured)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

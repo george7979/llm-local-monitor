@@ -1,5 +1,5 @@
 import { sshExec } from '../lib/ssh.js';
-import { selectPending } from '../lib/engine.js';
+import { selectPending, skippedWithUpdate } from '../lib/engine.js';
 
 export { selectPending };
 
@@ -14,15 +14,17 @@ function jobId(raw) {
  *
  * The app list is read here, at click time, rather than by a collector: the
  * answer has to be fresh at the moment of the call, not up to a poll interval
- * stale. `skipName` (the inactive engine's app) is never touched: upgrading a
+ * stale. `skip` (the non-active engine apps; a name, a list or null) is never touched: upgrading a
  * stopped app may start it, putting both engines on the same GPUs.
  */
-export async function upgradeApps(skipName = null) {
+export async function upgradeApps(skip = null) {
   const raw = await sshExec(
     `midclt call app.query '[]' '{"select":["name","upgrade_available","image_updates_available"]}'`
   );
-  const { charts, images, skipped } = selectPending(JSON.parse(raw), skipName);
-  const skippedName = skipped ? skipName : null;
+  const all = JSON.parse(raw);
+  const { charts, images } = selectPending(all, skip);
+  const skippedNames = skippedWithUpdate(all, skip);
+  const skippedName = skippedNames.length ? skippedNames.join(', ') : null;
   const apps = [...charts, ...images];
   if (!apps.length) return { ok: true, jobIds: [], apps: [], skipped: skippedName };
 

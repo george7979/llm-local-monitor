@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipNameFor, annotateGpus, switchPlan } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -78,22 +78,50 @@ test('buildEngine: enabled needs configured and found', () => {
   assert.deepEqual(Object.keys(off.apps), ['ollama']);
 });
 
-test('buildEngine: a failed or missing state degrades to switch-off', () => {
+test('buildEngine: host down or failed state -> no engine, enabled reflects configuration', () => {
   for (const bad of [null, { error: 'boom' }]) {
-    const e = buildEngine(bad, { configured: true, switching: false });
-    assert.equal(e.active, null);
-    assert.equal(e.enabled, false);
-    assert.deepEqual(e.apps, {});
+    const on = buildEngine(bad, { configured: true, switching: false });
+    assert.equal(on.active, null);
+    assert.equal(on.enabled, true);
+    assert.deepEqual(on.apps, {});
+    assert.equal(buildEngine(bad, { configured: false, switching: false }).enabled, false);
   }
 });
 
-test('skipNameFor is the inactive engine, null when unknown', () => {
-  const on = { enabled: true, active: 'llamacpp' };
-  assert.equal(skipNameFor(on, N), 'ollama');
-  assert.equal(skipNameFor({ enabled: true, active: 'ollama' }, N), 'llama-cpp');
-  assert.equal(skipNameFor({ enabled: true, active: null }, N), null);
-  assert.equal(skipNameFor({ enabled: false, active: 'ollama' }, N), null);
-  assert.equal(skipNameFor(null, N), null);
+test('skipListFor: every non-active engine app when configured', () => {
+  assert.deepEqual(skipListFor({ active: 'llamacpp' }, N, true), ['ollama']);
+  assert.deepEqual(skipListFor({ active: 'ollama' }, N, true), ['llama-cpp']);
+  assert.deepEqual(skipListFor({ active: null }, N, true), ['ollama', 'llama-cpp']);
+  assert.deepEqual(skipListFor({ active: 'ollama' }, N, false), []);
+  assert.deepEqual(skipListFor({ active: null }, N, false), []);
+});
+
+test('skippedWithUpdate names only skipped apps with a pending update', () => {
+  const apps = [
+    { name: 'ollama', upgrade_available: true },
+    { name: 'llama-cpp', image_updates_available: false },
+    { name: 'app-a', upgrade_available: true },
+  ];
+  assert.deepEqual(skippedWithUpdate(apps, ['ollama', 'llama-cpp']), ['ollama']);
+  assert.deepEqual(skippedWithUpdate(apps, null), []);
+  assert.deepEqual(skippedWithUpdate(apps, 'ollama'), ['ollama']);
+});
+
+test('selectPending accepts a list of names to skip', () => {
+  const apps = [
+    { name: 'ollama', upgrade_available: true },
+    { name: 'llama-cpp', image_updates_available: true },
+    { name: 'app-a', upgrade_available: true },
+  ];
+  assert.deepEqual(selectPending(apps, ['ollama', 'llama-cpp']), { charts: ['app-a'], images: [], skipped: true });
+  assert.deepEqual(selectPending(apps, []), { charts: ['ollama', 'app-a'], images: ['llama-cpp'], skipped: false });
+});
+
+test('engineAppName: unconfigured always the Ollama app, configured the active one', () => {
+  assert.equal(engineAppName({ active: null }, N, false), 'ollama');
+  assert.equal(engineAppName({ active: 'ollama' }, N, false), 'ollama');
+  assert.equal(engineAppName({ active: null }, N, true), null);
+  assert.equal(engineAppName({ active: 'llamacpp' }, N, true), 'llama-cpp');
 });
 
 test('annotateGpus copies and tags each GPU with its engine', () => {
@@ -113,4 +141,6 @@ test('switchPlan: stop the other, start the target, or do nothing', () => {
   // conflict: target already up, other must go
   assert.deepEqual(switchPlan(ap('RUNNING', 'RUNNING'), 'ollama', N), { missing: false, stop: 'llama-cpp', start: null, noop: false });
   assert.equal(switchPlan([{ name: 'ollama', state: 'RUNNING' }], 'llamacpp', N).missing, true);
+  // the other engine's app absent is also missing: no start may run
+  assert.equal(switchPlan([{ name: 'llama-cpp', state: 'STOPPED' }], 'llamacpp', N).missing, true);
 });

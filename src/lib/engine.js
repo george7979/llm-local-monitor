@@ -38,15 +38,16 @@ export function pickEngine(apps, procs, names) {
  * chart is current but whose image tag moved has only `image_updates_available`
  * and needs `app.pull_images`; there is no bulk form of that one.
  *
- * `skipName` (the inactive engine) is left out; `skipped` reports that it had
+ * `skip` (a name, a list of names or null: the engine apps that are not active) is left out; `skipped` reports that it had
  * an update pending.
  */
-export function selectPending(apps, skipName = null) {
+export function selectPending(apps, skip = null) {
+  const skipSet = new Set([skip].flat().filter(Boolean));
   const charts = [], images = [];
   let skipped = false;
   for (const a of apps) {
     const pending = a.upgrade_available || a.image_updates_available;
-    if (skipName && a.name === skipName) {
+    if (skipSet.has(a.name)) {
       if (pending) skipped = true;
       continue;
     }
@@ -73,17 +74,38 @@ export function appVramBytes(procs, appName) {
  */
 export function buildEngine(state, { configured, switching }) {
   if (!state || state.error) {
+    // The app cannot be checked, so `enabled` reflects configuration alone.
     return { active: null, conflict: false, notFound: null, apps: {}, updatesWaiting: false,
-      switching, enabled: false, ...(state?.error ? { error: state.error } : {}) };
+      switching, enabled: configured, ...(state?.error ? { error: state.error } : {}) };
   }
   const apps = configured ? state.apps : { ollama: state.apps.ollama };
   return { ...state, apps, switching, enabled: configured && !!state.apps.llamacpp };
 }
 
-/** The inactive engine's app name, left out of "Update all apps"; null = skip nothing. */
-export function skipNameFor(engine, names) {
-  if (!engine?.enabled || !engine.active) return null;
-  return (engine.active === 'ollama' ? names.llamacpp : names.ollama) || null;
+/**
+ * Engine apps "Update all apps" must leave alone: with llama.cpp configured,
+ * every engine app that is not the active one (both when none is active) —
+ * upgrading a stopped app may start it. Not configured: nothing (v1.5.1).
+ */
+export function skipListFor(engine, names, configured) {
+  if (!configured) return [];
+  const activeName = engine?.active ? names[engine.active] : null;
+  return [names.ollama, names.llamacpp].filter(n => n && n !== activeName);
+}
+
+/** The skipped apps that actually had an update pending. */
+export function skippedWithUpdate(apps, skip) {
+  const skipSet = new Set([skip].flat().filter(Boolean));
+  return apps.filter(a => skipSet.has(a.name) && (a.upgrade_available || a.image_updates_available)).map(a => a.name);
+}
+
+/**
+ * App the app card and restart act on. Unconfigured: always the Ollama app,
+ * whatever its state (v1.5.1). Configured: the active engine's app, else null.
+ */
+export function engineAppName(engine, names, configured) {
+  if (!configured) return names.ollama;
+  return engine?.active ? names[engine.active] : null;
 }
 
 /** Copies of the GPU cards with the engine holding each GPU (never mutates the cached originals). */
@@ -104,8 +126,8 @@ export function switchPlan(apps, target, names) {
   const targetName = names[target];
   const otherName = names[target === 'ollama' ? 'llamacpp' : 'ollama'];
   const stateOf = name => apps.find(a => a.name === name)?.state;
-  if (!stateOf(targetName)) return { missing: true, stop: null, start: null, noop: false };
   const otherState = stateOf(otherName);
+  if (!stateOf(targetName) || !otherState) return { missing: true, stop: null, start: null, noop: false };
   const stop = otherState && otherState !== 'STOPPED' ? otherName : null;
   const start = stateOf(targetName) === 'STOPPED' ? targetName : null;
   return { missing: false, stop, start, noop: !stop && !start };
