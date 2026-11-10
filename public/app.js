@@ -838,9 +838,10 @@ function renderEngineApp(data, eng, host, slots) {
   statusRow.appendChild(stateEl);
   statusRow.appendChild(updateBadge);
 
-  // TrueNAS pins the image by digest — show only repo:tag, keep the full reference in the tooltip
+  // Show only name:tag — no registry, no organisation, no digest (TrueNAS pins
+  // the image by digest); the full reference stays in the tooltip.
   const image = data.image || '';
-  if (imageEl) { imageEl.textContent = image.split('@')[0]; imageEl.title = image; }
+  if (imageEl) { imageEl.textContent = image.split('@')[0].split('/').pop(); imageEl.title = image; }
   wrap.appendChild(statusRow);
 
   const list = el('div', 'app-rows');
