@@ -214,6 +214,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 11 | Acceptance: restart of the llama.cpp app from the dashboard (stop is awaited, up to ~2 min); launch-parameter line matches the flags the app really runs with | ⬜ Open |
 | 12 | Engine actions respect TrueNAS jobs: switch and restart await the start job; switch, restart and Update all apps refuse (409) while a TrueNAS job runs on an engine app, 503 when the job list is unreadable; `engine.busy` in status and UI | ✅ Done |
 | 13 | README and PRD FR2.3 describe the refusal rule (in-monitor lock plus TrueNAS jobs) instead of "never overlap" | ✅ Done |
+| 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ⬜ Open |
 | 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
