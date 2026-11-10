@@ -4,6 +4,7 @@ import {
   parseMetrics, formatParams, mapModelRow, slotSample, liveSpeed, activity,
   requestWindow, lifetimeStats, contextFill, launchParams,
   overallActivity, countersWentBackwards, pickSpeed, pickMtp,
+  initialState, advance, modelPayloadsOk,
 } from '../src/lib/llamacppParse.js';
 
 const METRICS = `# HELP llamacpp:prompt_tokens_total x
@@ -140,4 +141,64 @@ test('pickMtp: last, then lifetime, then null', () => {
   assert.deepEqual(pickMtp({ mtp: null }, { mtp: 50 }), { pct: 50, window: 'lifetime' });
   assert.deepEqual(pickMtp(null, { mtp: 0 }), { pct: 0, window: 'lifetime' });
   assert.equal(pickMtp(null, { mtp: null }), null);
+});
+
+const gen = (n, task = 1) => ({ id: 0, id_task: task, is_processing: true, next_token: [{ n_decoded: n }] });
+const met = (t, s, d = 0, a = 0) => ({
+  tokens_predicted_total: t, tokens_predicted_seconds_total: s,
+  spec_decode_num_draft_tokens_total: d, spec_decode_num_accepted_tokens_total: a,
+});
+test('advance: first poll has no live speed or window, only lifetime', () => {
+  const r = advance(initialState(), { slots: [gen(10)], metrics: met(100, 10), now: 1000 });
+  assert.deepEqual(r.lives, [null]);
+  assert.equal(r.lastWindow, null);
+  assert.equal(r.lifetime.speed, 10);
+  assert.equal(r.state.slots.size, 1);
+});
+test('advance: second poll gives live speed and a window', () => {
+  const s1 = advance(initialState(), { slots: [gen(10)], metrics: met(100, 10), now: 1000 }).state;
+  const r = advance(s1, { slots: [gen(40)], metrics: met(200, 15, 10, 5), now: 2000 });
+  assert.deepEqual(r.lives, [30]);
+  assert.equal(r.lastWindow.speed, 20);
+  assert.equal(r.lastWindow.mtp, 50);
+});
+test('advance: last window survives polls without new tokens', () => {
+  let r = advance(initialState(), { slots: [], metrics: met(100, 10), now: 1 });
+  r = advance(r.state, { slots: [], metrics: met(200, 15), now: 2 });
+  r = advance(r.state, { slots: [], metrics: met(200, 15), now: 3 });
+  assert.equal(r.lastWindow.speed, 20);
+});
+test('advance: counters backwards drops slots, window and live speed, no negatives', () => {
+  let r = advance(initialState(), { slots: [gen(10)], metrics: met(100, 10), now: 1000 });
+  r = advance(r.state, { slots: [gen(40)], metrics: met(200, 15), now: 2000 });
+  const back = advance(r.state, { slots: [gen(50)], metrics: met(5, 1), now: 3000 });
+  assert.deepEqual(back.lives, [null]);
+  assert.equal(back.lastWindow, null);
+  assert.equal(back.state.slots.size, 0);
+  assert.equal(back.state.lastWindow, null);
+  assert.equal(back.state.metrics.tokens_predicted_total, 5);
+  assert.equal(back.lifetime.speed, 5);
+});
+test('advance: metrics failed keeps old metrics/window in state, reports none', () => {
+  let r = advance(initialState(), { slots: [], metrics: met(100, 10), now: 1 });
+  r = advance(r.state, { slots: [], metrics: met(200, 15), now: 2 });
+  const f = advance(r.state, { slots: [gen(5)], metrics: null, now: 3 });
+  assert.equal(f.lastWindow, null);
+  assert.equal(f.lifetime, null);
+  assert.equal(f.state.metrics.tokens_predicted_total, 200);
+  assert.equal(f.state.lastWindow.speed, 20);
+  assert.equal(f.state.slots.size, 1);
+});
+test('advance: slots failed clears slot samples', () => {
+  const s1 = advance(initialState(), { slots: [gen(10)], metrics: null, now: 1 }).state;
+  const r = advance(s1, { slots: null, metrics: null, now: 2 });
+  assert.deepEqual(r.lives, []);
+  assert.equal(r.state.slots.size, 0);
+});
+test('modelPayloadsOk', () => {
+  assert.equal(modelPayloadsOk({}, { data: [] }), true);
+  assert.equal(modelPayloadsOk(null, { data: [] }), false);
+  assert.equal(modelPayloadsOk([], { data: [] }), false);
+  assert.equal(modelPayloadsOk({}, {}), false);
+  assert.equal(modelPayloadsOk({}, null), false);
 });

@@ -162,3 +162,51 @@ export function pickMtp(last, lifetime) {
   if (lifetime?.mtp != null) return { pct: lifetime.mtp, window: 'lifetime' };
   return null;
 }
+
+/** Empty between-poll state: nothing sampled yet. */
+export function initialState() {
+  return { slots: new Map(), metrics: null, lastWindow: null };
+}
+
+/** /props and /v1/models answered 200 with the shape the model row needs. */
+export function modelPayloadsOk(props, models) {
+  return !!props && typeof props === 'object' && !Array.isArray(props)
+    && !!models && Array.isArray(models.data);
+}
+
+/**
+ * One step of the between-poll state machine. Pure.
+ * `slots`: raw /slots array, or null when that GET failed.
+ * `metrics`: parsed /metrics object, or null when that GET failed.
+ * Returns the next state plus this poll's per-slot live speeds, lifetime stats
+ * and last-window result (null when metrics failed or counters went backwards).
+ */
+export function advance(state, { slots, metrics, now }) {
+  const cur = new Map();
+  let lives = [];
+  for (const s of slots ?? []) {
+    const sample = slotSample(s, now);
+    cur.set(s.id, sample);
+    lives.push(liveSpeed(state.slots.get(s.id), sample));
+  }
+  if (!metrics) {
+    // Metrics unavailable: keep the old metrics and window, report no window figures.
+    return { state: { ...state, slots: cur }, lives, lifetime: null, lastWindow: null };
+  }
+  if (countersWentBackwards(state.metrics, metrics)) {
+    // Server restarted: nothing from before is comparable.
+    return {
+      state: { slots: new Map(), metrics, lastWindow: null },
+      lives: lives.map(() => null),
+      lifetime: lifetimeStats(metrics),
+      lastWindow: null,
+    };
+  }
+  const lastWindow = requestWindow(state.metrics, metrics) ?? state.lastWindow;
+  return {
+    state: { slots: cur, metrics, lastWindow },
+    lives,
+    lifetime: lifetimeStats(metrics),
+    lastWindow,
+  };
+}
