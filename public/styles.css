@@ -440,6 +440,11 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex;
   flex-direction: column;
 }
+/* Status row stays on top; the entry columns centre in the space below it. */
+#engine-app-content .app-rows {
+  flex: 1;
+  justify-content: center;
+}
 
 /* ── MEMORY CARD vertical centering ───────── */
 
