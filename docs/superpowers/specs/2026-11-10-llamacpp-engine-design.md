@@ -128,21 +128,23 @@ active engine's segment is highlighted.
 ### App card
 
 Title follows the engine: `OLLAMA APP` / `LLAMA.CPP APP`. Under the state and
-update badges the card lists `KEY  value` entries: context across the full
-width, then two columns grouped by subject — left, the host side (CPU, RAM,
-slots, threads); right, how the model is run (split, speculative decoding, KV
-cache, batch, reasoning). An entry whose data is missing is left out; with
-nothing for the right column (Ollama), CPU and RAM sit side by side. The update
-badge works as today.
+update badges the card lists `KEY  value` entries in two columns grouped by
+subject — left, the host side (context, CPU, RAM, slots, threads); right, how
+the model is run (split, speculative decoding, KV cache, batch, reasoning). An
+entry whose data is missing is left out; with nothing for the right column
+(Ollama), CPU and RAM form one full-width column. The update badge works as
+today.
 
 ```
-CONTEXT         52k / 128k · 41% · cache 48k
-CPU   4% · 24 cores    SPLIT        tensor
-RAM          9.7 GB    MTP              ×3
-SLOTS             1    KV             q8_0
-THREADS           8    BATCH    2048 / 512
-                       REASONING      2048
+CONTEXT  52k / 128k    SPLIT        tensor
+CPU   4% · 24 cores    MTP              ×3
+RAM          9.7 GB    KV             q8_0
+SLOTS             1    BATCH    2048 / 512
+THREADS           8    REASONING      2048
 ```
+
+The context entry's tooltip gives exact token counts, the fill percentage and
+how much came from cache.
 
 `CPU` and `RAM` come from the active app's container for either engine (`RAM`
 shows `used / limit` when the app has a memory limit). The lines from `CONTEXT`

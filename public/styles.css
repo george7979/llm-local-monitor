@@ -486,6 +486,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .app-rows { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
 .app-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.app-cols.single { grid-template-columns: 1fr; }
 .app-col { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .app-row {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
