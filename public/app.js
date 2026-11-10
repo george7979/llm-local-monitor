@@ -15,6 +15,31 @@ function setMsg(node, text, isError = false) {
   node.classList.toggle('is-error', isError);
 }
 
+// ── Engine state ─────────────────────────────────────────────────────
+const ENGINE_NAMES = { ollama: 'Ollama', llamacpp: 'llama.cpp' };
+const ENGINE_TITLES = { ollama: 'OLLAMA', llamacpp: 'LLAMA.CPP' };
+const SWITCH_GIVE_UP_MS = 2 * 60 * 1000;
+
+let lastEngine = {};          // engine object of the latest poll
+let switchingTo = null;       // target of a switch we sent, until a poll shows it active
+let switchSentAt = 0;
+let switchLine = false;       // the action line currently shows a switching message
+
+// Old Ollama view (v1.5.1) when llama.cpp is not configured.
+const ollamaView = eng => !eng.enabled || eng.active === 'ollama';
+
+// The active engine's own update flag; without the feature, the Ollama app's.
+function updatesWaiting(eng, app) {
+  return eng.enabled ? !!eng.updatesWaiting : !!app?.upgradeAvailable;
+}
+
+// 82000 -> "82k", 1500 -> "1.5k"
+function fmtK(n) {
+  if (!n) return '0';
+  if (n < 1000) return String(n);
+  return n < 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : Math.round(n / 1000) + 'k';
+}
+
 // ── GPU modal state ──────────────────────────────────────────────────
 let gpuModalBusId = null;
 let lastGpuSnapshot = { gpu: null, procs: null };
@@ -26,7 +51,8 @@ const PENDING_WARN_MS = 10 * 60 * 1000;  // 10 min: say it is taking unusually l
 
 let pendingLoad = null;       // { model, startedAt } — cosmetic only
 let lastLoadedModels = [];    // latest /api/ps snapshot, for the modal markers
-let modelsModalOpen = false;  // declared here, used by the model browser modal
+let modelsModalOpen = false;
+let modelListRequested = false;  // the installed-model list is fetched once, when Ollama is first seen  // declared here, used by the model browser modal
 
 function readPending() {
   try {
@@ -179,11 +205,21 @@ function fmtUptime(sec) {
 async function pollAll() {
   try {
     const data = await apiFetch('/api/status');
-    renderStatus(data.host, data.ipmi, data.ollamaApp);
-    renderOllama(data.ollama);
-    lastLoadedModels = data.ollama?.models || [];
+    const eng = data.engine || {};
+    lastEngine = eng;
+    // A pending Ollama load means nothing once another engine (or none) runs.
+    if (data.host?.alive && eng.enabled && !eng.error && eng.active !== 'ollama') clearPending();
+    // /api/models is Ollama-only (409 with llama.cpp), so it waits for an Ollama view.
+    if (data.host?.alive && !modelListRequested && ollamaView(eng) && (eng.active === 'ollama' || !eng.enabled)) {
+      modelListRequested = true;
+      refreshAvailableModels();
+    }
+    renderStatus(data.host, data.ipmi, eng, data.engineApp);
+    renderEngineSwitch(data.host, eng);
+    renderModels(data.models, eng, data.host);
+    lastLoadedModels = eng.active === 'ollama' || !eng.enabled ? (data.models?.models || []) : [];
     if (modelsModalOpen) renderModelsModal();
-    renderOllamaApp(data.ollamaApp);
+    renderEngineApp(data.engineApp, eng, data.host, data.models?.slots);
     renderGpu(data.gpu);
     lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
     if (gpuModalBusId) renderGpuModal();
@@ -212,16 +248,14 @@ fetch('/api/config').then(r => r.json()).then(c => {
   const intervalMs = ((c.pollIntervalSec || 5) * 1000);
   setInterval(pollAll, intervalMs);
   pollAll();
-  refreshAvailableModels();
 }).catch(() => {
   setInterval(pollAll, 5000);
   pollAll();
-  refreshAvailableModels();
 });
 
 // ── Status ────────────────────────────────────────────────────────────
 
-function renderStatus(host, ipmi, ollamaApp) {
+function renderStatus(host, ipmi, eng, engineApp) {
   if (!host) return;
   const ring  = document.getElementById('status-ring');
   const dot   = document.getElementById('pill-dot');
@@ -232,6 +266,7 @@ function renderStatus(host, ipmi, ollamaApp) {
   const sleep = document.getElementById('btn-sleep');
   const rst   = document.getElementById('btn-restart');
   const upg   = document.getElementById('btn-upgrade');
+  const rstLabel = document.getElementById('btn-restart-label');
 
   // Header pill = IPMI availability
   if (ipmi?.alive) {
@@ -246,8 +281,9 @@ function renderStatus(host, ipmi, ollamaApp) {
   if (host.alive) {
     ring.className  = 'status-ring alive';
     text.textContent  = 'Online';
-    wake.disabled = true; sleep.disabled = false; rst.disabled = false;
-    upg.disabled = !ollamaApp?.upgradeAvailable;
+    wake.disabled = true; sleep.disabled = false;
+    rst.disabled = !!eng.enabled && !eng.active;
+    upg.disabled = !updatesWaiting(eng, engineApp);
   } else {
     ring.className  = 'status-ring dead';
     text.textContent  = 'Powered off';
@@ -255,14 +291,188 @@ function renderStatus(host, ipmi, ollamaApp) {
     upg.disabled = true;
   }
 
+  rstLabel.textContent = !eng.enabled ? 'Restart Ollama'
+    : eng.active ? `Restart ${ENGINE_NAMES[eng.active]}` : 'Restart engine';
+
   sub.textContent = host.checkedAt
     ? 'checked ' + new Date(host.checkedAt).toLocaleTimeString() : '—';
+}
+
+// ── Engine switch ─────────────────────────────────────────────────────
+
+function renderEngineSwitch(host, eng) {
+  const box = document.getElementById('engine-switch');
+  const warn = document.getElementById('engine-warn');
+  const line = document.getElementById('action-msg');
+  const alive = !!host?.alive;
+
+  box.hidden = !eng.enabled;
+  for (const b of box.querySelectorAll('button')) {
+    const on = eng.active === b.dataset.engine;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-pressed', String(on));
+    b.disabled = !alive || !!eng.switching || !!switchingTo;
+  }
+
+  warn.textContent = '';
+  if (alive && eng.conflict) warn.appendChild(el('div', null, 'Both engines are running — pick one'));
+  if (alive && eng.notFound) {
+    warn.appendChild(el('div', null, `llama.cpp app “${eng.notFound}” not found in TrueNAS`));
+  }
+  warn.hidden = !warn.firstChild;
+
+  // The switch POST answers once the start is queued; the success signal is
+  // the target showing up as the active engine.
+  if (switchingTo && Date.now() - switchSentAt > SWITCH_GIVE_UP_MS) switchingTo = null;
+  if (switchingTo && eng.active === switchingTo && !eng.switching && !eng.conflict) switchingTo = null;
+  if (switchingTo) {
+    setMsg(line, `Switching to ${ENGINE_NAMES[switchingTo]}…`);
+    switchLine = true;
+  } else if (eng.switching) {
+    setMsg(line, 'Switching engine…');
+    switchLine = true;
+  } else if (switchLine) {
+    setMsg(line, '');
+    switchLine = false;
+  }
+}
+
+async function switchEngine(target) {
+  const eng = lastEngine;
+  const to = ENGINE_NAMES[target];
+  const other = ENGINE_NAMES[target === 'ollama' ? 'llamacpp' : 'ollama'];
+  let question;
+  if (!eng.active) question = `Start ${to}?`;
+  else if (eng.active !== target) question = `Switch to ${to}? ${other} will be stopped and its loaded models unloaded.`;
+  else if (eng.conflict) question = `Both engines are running. Stop ${other} and keep ${to}?`;
+  else return;
+  if (!confirm(question)) return;
+
+  const msg = document.getElementById('action-msg');
+  switchingTo = target;
+  switchSentAt = Date.now();
+  switchLine = true;
+  clearPending();
+  setMsg(msg, `Switching to ${to}…`);
+  for (const b of document.querySelectorAll('#engine-switch button')) b.disabled = true;
+  try {
+    await apiFetch('/api/switch-engine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    });
+  } catch (e) {
+    switchingTo = null;
+    setMsg(msg, 'Error: ' + e.message, true);
+    switchLine = false;
+    setTimeout(() => { if (!switchLine) setMsg(msg, ''); }, 8000);
+  }
+  pollAll();
+}
+
+for (const b of document.querySelectorAll('#engine-switch button')) {
+  b.addEventListener('click', () => switchEngine(b.dataset.engine));
+}
+
+// ── Loaded models ─────────────────────────────────────────────────────
+
+function renderModels(data, eng, host) {
+  const wrap = document.getElementById('engine-content');
+  const speed = document.getElementById('models-speed');
+  const llama = eng.active === 'llamacpp';
+  document.getElementById('btn-models').hidden = eng.enabled && eng.active !== 'ollama';
+  speed.hidden = true;
+
+  if (llama && data && !data.error) { renderLlamacppModels(data, wrap, speed); return; }
+  if (!host?.alive || !data && eng.error) {
+    wrap.textContent = '';
+    wrap.appendChild(el('span', 'dim-text', host?.alive ? 'Temporarily unavailable' : 'Host unavailable'));
+    return;
+  }
+  if (!data && !eng.active) {
+    wrap.textContent = '';
+    wrap.appendChild(el('span', 'dim-text', 'No engine running'));
+    return;
+  }
+  renderOllama(data);
+}
+
+// Latest Ollama table redraw for doModelAction; a no-op once another engine owns the card.
+function redrawOllama() {
+  if (ollamaView(lastEngine)) renderOllama({ models: lastLoadedModels });
+}
+
+function renderLlamacppModels(data, wrap, speed) {
+  wrap.textContent = '';
+  if (data.loading) {
+    wrap.appendChild(el('span', 'dim-text', 'Loading model…'));
+    return;
+  }
+
+  renderSpeed(data, speed);
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Model', 'Params', 'Quant', 'VRAM', 'Ctx'].forEach(h => hr.appendChild(el('th', null, h)));
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  for (const m of data.models || []) {
+    const tr = document.createElement('tr');
+    [['td-model', m.name, m.name],
+     ['td-mono', m.parameterSize || '—', null],
+     ['td-mono', m.quantization || '—', null],
+     ['td-mono', m.sizeVram ? gb(m.sizeVram) + ' GB' : '—', null],
+     ['td-mono', m.contextLength ? fmtK(m.contextLength) : '—', null]]
+      .forEach(([cls, val, title]) => {
+        const td = el('td', cls, val);
+        if (title) td.title = title;
+        tr.appendChild(td);
+      });
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+}
+
+const WINDOW_TITLES = {
+  live: 'live',
+  last: 'last finished request',
+  lifetime: 'average since engine start',
+};
+
+// Header right side: ▶ 21.7 tok/s · MTP 61%. Only a live figure gets the marker.
+function renderSpeed(data, node) {
+  node.textContent = '';
+  node.hidden = false;
+  const sp = data.speed;
+  let part;
+  if (sp && sp.window === 'live') {
+    part = el('span', 'speed-live', `▶ ${Number(sp.value).toFixed(1)} tok/s`);
+  } else if (data.activity === 'reading') {
+    part = el('span', 'speed-dim', 'reading prompt…');
+    part.title = 'processing the prompt';
+  } else if (sp) {
+    part = el('span', 'speed-dim', `${Number(sp.value).toFixed(1)} tok/s`);
+  } else {
+    part = el('span', 'speed-dim', '—');
+  }
+  if (sp && part.title === '') part.title = WINDOW_TITLES[sp.window] || '';
+  node.appendChild(part);
+
+  if (data.mtp) {
+    node.appendChild(el('span', 'speed-dim', ' · '));
+    const mtp = el('span', 'speed-dim', `MTP ${data.mtp.pct}%`);
+    mtp.title = WINDOW_TITLES[data.mtp.window] || '';
+    node.appendChild(mtp);
+  }
 }
 
 // ── Ollama ────────────────────────────────────────────────────────────
 
 function renderOllama(data) {
-  const wrap = document.getElementById('ollama-content');
+  const wrap = document.getElementById('engine-content');
   wrap.textContent = '';
 
   const models = data && !data.error ? (data.models || []) : null;
@@ -385,7 +595,15 @@ function renderGpu(data) {
     const tempCls = g.temperature >= 85 ? 'badge hot' : g.temperature >= 75 ? 'badge warn' : 'badge';
     badges.appendChild(el('span', tempCls, `${g.temperature}°C`));
     badges.appendChild(el('span', 'badge', `${g.powerDraw}W`));
-    if (g.hasOllama) badges.appendChild(el('span', 'badge-ollama', 'OLLAMA'));
+    if (g.engine) {
+      // "LLAMA.CPP" wraps the badge row on phone-width cards; CSS drops the suffix there.
+      const full = ENGINE_TITLES[g.engine] || g.engine.toUpperCase();
+      const dot = full.indexOf('.');
+      const badge = el('span', 'badge-engine', dot > 0 ? full.slice(0, dot) : full);
+      if (dot > 0) badge.appendChild(el('span', 'badge-suffix', full.slice(dot)));
+      badge.title = ENGINE_NAMES[g.engine] || g.engine;
+      badges.appendChild(badge);
+    }
     if (g.pcieGen && g.pcieWidth) badges.appendChild(el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`));
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
     card.appendChild(badges);
@@ -488,7 +706,7 @@ function renderGpuModal() {
   body.appendChild(table);
 }
 
-// ── Ollama App ────────────────────────────────────────────────────────
+// ── Engine app ────────────────────────────────────────────────────────
 
 function fmt(bytes) {
   if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
@@ -497,27 +715,77 @@ function fmt(bytes) {
   return bytes + ' B';
 }
 
-function renderOllamaApp(data) {
-  const wrap = document.getElementById('ollama-app-content');
+// State badge; DEPLOYING reads as "Starting…" only when engines can be switched.
+function stateBadge(state, eng) {
+  const text = (state || '').toUpperCase();
+  if (eng.enabled && text === 'DEPLOYING') return el('span', 'app-state-badge starting', 'STARTING…');
+  return el('span', `app-state-badge ${text === 'RUNNING' ? 'running' : 'stopped'}`, text || '—');
+}
+
+// No engine active: both apps with the state TrueNAS reports.
+function renderNoEngineApps(eng, wrap) {
+  const names = Object.keys(eng.apps || {});
+  if (!names.length) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
+  for (const key of names) {
+    const row = el('div', 'app-status-row');
+    row.appendChild(el('span', 'engine-app-name', ENGINE_NAMES[key]));
+    row.appendChild(stateBadge(eng.apps[key]?.state, eng));
+    wrap.appendChild(row);
+  }
+}
+
+// CONTEXT bar(s) from the slots, one per slot; cache figure beside the label.
+function renderContext(slots, wrap) {
+  if (!slots?.length) return;
+  const box = el('div', 'engine-block');
+  slots.forEach((sl, i) => {
+    const pct = sl.total > 0 ? Math.round(sl.used / sl.total * 100) : 0;
+    const cls = pct > 90 ? 'fill-high' : pct > 70 ? 'fill-mid' : 'fill-low';
+    const label = slots.length > 1 ? `CONTEXT ${i + 1}` : 'CONTEXT';
+    const bar = makeGpuBar(label, `${fmtK(sl.used)} / ${fmtK(sl.total)}${sl.cached ? ` (cache ${fmtK(sl.cached)})` : ''}`, pct, cls);
+    bar.title = `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`;
+    box.appendChild(bar);
+  });
+  wrap.appendChild(box);
+}
+
+// Launch parameters, read-only; the full command is the tooltip.
+function renderLaunch(launch, wrap) {
+  if (!launch?.params?.length) return;
+  const box = el('div', 'engine-launch',
+    launch.params.map(p => `${p.label} ${p.value}`.trim()).join(' · '));
+  if (launch.command) box.title = launch.command;
+  wrap.appendChild(box);
+}
+
+function renderEngineApp(data, eng, host, slots) {
+  const wrap = document.getElementById('engine-app-content');
+  const title = document.getElementById('engine-app-title');
+  const imageEl = document.getElementById('engine-app-image');
   wrap.textContent = '';
 
+  title.textContent = !eng.enabled ? 'OLLAMA APP'
+    : eng.active ? `${ENGINE_TITLES[eng.active]} APP` : 'ENGINE APPS';
+  if (imageEl) { imageEl.textContent = ''; imageEl.title = ''; }
+
+  if (!host?.alive) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
+  if (!data && eng.enabled && !eng.active) { renderNoEngineApps(eng, wrap); return; }
   if (!data) { wrap.appendChild(el('span', 'dim-text', 'Host unavailable')); return; }
   if (data.error) { wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable')); return; }
 
   // Status row
   const statusRow = el('div', 'app-status-row');
-  const stateText = (data.state || '').toUpperCase();
-  const stateBadge = el('span', `app-state-badge ${stateText === 'RUNNING' ? 'running' : 'stopped'}`, stateText || '—');
-  const updateBadge = el('span', `app-update-badge ${data.upgradeAvailable ? 'update clickable' : 'ok'}`,
-    data.upgradeAvailable ? '⬆ Update' : '✓ Up to date');
-  if (data.upgradeAvailable) {
+  const stateEl = stateBadge(data.state, eng);
+  const hasUpdate = updatesWaiting(eng, data);
+  const updateBadge = el('span', `app-update-badge ${hasUpdate ? 'update clickable' : 'ok'}`,
+    hasUpdate ? '⬆ Update' : '✓ Up to date');
+  if (hasUpdate) {
     updateBadge.title = 'Click to update every TrueNAS app that has an update waiting';
     updateBadge.onclick = () => upgradeAllApps();
   }
-  statusRow.appendChild(stateBadge);
+  statusRow.appendChild(stateEl);
   statusRow.appendChild(updateBadge);
 
-  const imageEl = document.getElementById('ollama-app-image');
   // TrueNAS pins the image by digest — show only repo:tag, keep the full reference in the tooltip
   const image = data.image || '';
   if (imageEl) { imageEl.textContent = image.split('@')[0]; imageEl.title = image; }
@@ -567,6 +835,10 @@ function renderOllamaApp(data) {
 
   wrap.appendChild(grid);
 
+  if (eng.active === 'llamacpp') {
+    renderContext(slots, wrap);
+    renderLaunch(data.launch, wrap);
+  }
 }
 
 // ── Memory ────────────────────────────────────────────────────────────
@@ -841,9 +1113,9 @@ async function checkForUpdate() {
 // Triggered from Ollama's update badge, but not limited to Ollama: the list of
 // apps is resolved server-side at call time, so the names are only known once
 // the response comes back — hence the generic confirm and the specific result.
-async function upgradeAllApps(msgId = 'ollama-upgrade-msg') {
+async function upgradeAllApps(msgId = 'engine-upgrade-msg') {
   if (!confirm('Update every TrueNAS app that has an update waiting?\n' +
-               'Each one restarts as it upgrades — Ollama will be unavailable for a few minutes.')) return;
+               'Each one restarts as it upgrades — ' + (lastEngine.enabled ? 'the active engine' : 'Ollama') + ' will be unavailable for a few minutes.')) return;
   const msg = document.getElementById(msgId);
   setMsg(msg, 'Upgrade started — apps will restart automatically...');
   try {
@@ -851,9 +1123,11 @@ async function upgradeAllApps(msgId = 'ollama-upgrade-msg') {
     if (!res.ok) {
       setMsg(msg, 'Error: ' + (res.error || '?'), true);
     } else if (!res.apps.length) {
-      setMsg(msg, 'Nothing to upgrade — every app is already current.');
+      setMsg(msg, 'Nothing to upgrade — every app is already current.' +
+        (res.skipped ? ` — skipped ${res.skipped} (inactive engine)` : ''));
     } else {
-      setMsg(msg, `Upgrading ${res.apps.length} app(s): ${res.apps.join(', ')} — check back in a few minutes.`);
+      setMsg(msg, `Upgrading ${res.apps.length} app(s): ${res.apps.join(', ')} — check back in a few minutes.` +
+        (res.skipped ? ` — skipped ${res.skipped} (inactive engine)` : ''));
     }
   } catch (e) {
     setMsg(msg, 'Error: ' + e.message, true);
@@ -875,7 +1149,7 @@ async function doModelAction(kind, name) {
     setPending(name);
     // Redraw the card now instead of waiting up to a full poll interval —
     // otherwise closing the modal right after clicking shows no feedback.
-    renderOllama({ models: lastLoadedModels });
+    redrawOllama();
   }
   if (modelsModalOpen) renderModelsModal();
   setMsg(msg, kind === 'load' ? `Requested ${name}…` : `Unloading ${name}…`);
@@ -907,7 +1181,7 @@ async function doModelAction(kind, name) {
   // Redraw unconditionally: pollAll() swallows its own errors, so relying on
   // it to clear the ghost row leaves it stranded exactly when the backend is
   // the thing that failed.
-  renderOllama({ models: lastLoadedModels });
+  redrawOllama();
   if (modelsModalOpen) renderModelsModal();
   setTimeout(() => { setMsg(msg, ''); }, 15000);
   pollAll();
@@ -916,16 +1190,16 @@ async function doModelAction(kind, name) {
 async function action(name) {
   const confirmMsg = {
     sleep: 'Shut down the server?',
-    'restart-ollama': 'Restart Ollama? Loaded models will be unloaded.',
+    'restart-engine': `Restart ${ENGINE_NAMES[lastEngine.active] || 'Ollama'}? Loaded models will be unloaded.`,
   }[name];
   if (confirmMsg && !confirm(confirmMsg)) return;
 
   const msg = document.getElementById('action-msg');
-  setMsg(msg, { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-ollama': 'Restarting...' }[name] || '...');
+  setMsg(msg, { wake: 'Waking up...', sleep: 'Shutting down...', 'restart-engine': 'Restarting...' }[name] || '...');
   try {
     const res = await apiFetch(`/api/${name}`, { method: 'POST' });
     setMsg(msg, res.ok
-      ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-ollama': 'Restart queued' }[name] || 'OK')
+      ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-engine': 'Restart queued' }[name] || 'OK')
       : 'Error: ' + (res.error || '?'), !res.ok);
   } catch (e) {
     setMsg(msg, 'Error: ' + e.message, true);

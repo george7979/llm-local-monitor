@@ -34,7 +34,7 @@
     <div class="card" id="card-status">
       <div class="card-label-row">
         <div class="card-label">SERVER</div>
-        <span id="server-uptime" class="ollama-image-tag">—</span>
+        <span id="server-uptime" class="engine-image-tag">—</span>
       </div>
       <div class="status-main">
         <div class="status-ring" id="status-ring">
@@ -45,6 +45,11 @@
           <div class="status-sub" id="status-checked">—</div>
         </div>
       </div>
+      <div class="engine-switch" id="engine-switch" role="group" aria-label="Engine" hidden>
+        <button type="button" id="sw-ollama" data-engine="ollama">Ollama</button>
+        <button type="button" id="sw-llamacpp" data-engine="llamacpp">llama.cpp</button>
+      </div>
+      <div class="engine-warn" id="engine-warn" hidden></div>
       <div class="action-list">
         <button id="btn-wake" onclick="action('wake')" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
@@ -54,9 +59,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           Shut down
         </button>
-        <button id="btn-restart" onclick="action('restart-ollama')">
+        <button id="btn-restart" onclick="action('restart-engine')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.15-7.36"/></svg>
-          Restart Ollama
+          <span id="btn-restart-label">Restart Ollama</span>
         </button>
         <button id="btn-upgrade" onclick="upgradeAllApps('action-msg')" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -76,23 +81,26 @@
       <div id="network-content"><span class="dim-text">Loading...</span></div>
     </div>
 
-    <div class="card" id="card-ollama-app">
+    <div class="card" id="card-engine-app">
       <div class="card-label-row">
-        <div class="card-label">OLLAMA APP</div>
-        <span id="ollama-app-image" class="ollama-image-tag"></span>
+        <div class="card-label" id="engine-app-title">OLLAMA APP</div>
+        <span id="engine-app-image" class="engine-image-tag"></span>
       </div>
-      <div id="ollama-app-content"><span class="dim-text">Loading...</span></div>
-      <div class="action-msg" id="ollama-upgrade-msg"></div>
+      <div id="engine-app-content"><span class="dim-text">Loading...</span></div>
+      <div class="action-msg" id="engine-upgrade-msg"></div>
     </div>
 
   </div>
 
-  <div class="card" id="card-ollama">
+  <div class="card" id="card-engine-models">
     <div class="card-label-row">
       <div class="card-label">LOADED MODELS</div>
-      <button id="btn-models" class="btn-small" onclick="openModelsModal()">Models&hellip;</button>
+      <span class="models-head-right">
+        <span id="models-speed" class="models-speed" hidden></span>
+        <button id="btn-models" class="btn-small" onclick="openModelsModal()">Models&hellip;</button>
+      </span>
     </div>
-    <div id="ollama-content"><span class="dim-text">Loading...</span></div>
+    <div id="engine-content"><span class="dim-text">Loading...</span></div>
     <div class="action-msg" id="models-card-msg"></div>
   </div>
 
