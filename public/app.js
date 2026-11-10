@@ -52,7 +52,7 @@ const PENDING_WARN_MS = 10 * 60 * 1000;  // 10 min: say it is taking unusually l
 let pendingLoad = null;       // { model, startedAt } — cosmetic only
 let lastLoadedModels = [];    // latest /api/ps snapshot, for the modal markers
 let modelsModalOpen = false;
-let modelListRequested = false;  // the installed-model list is fetched once, when Ollama is first seen  // declared here, used by the model browser modal
+let modelListRequested = false;  // installed-model list fetched once Ollama is seen; reset on failure
 
 function readPending() {
   try {
@@ -99,11 +99,14 @@ async function refreshAvailableModels() {
     if (data.error) throw new Error(data.error);
     availableModels = data.models || [];
     setMsg(msg, '');
+    if (modelsModalOpen) renderModelsModal();
+    return true;
   } catch (e) {
     availableModels = [];
     setMsg(msg, 'Could not load model list: ' + e.message, true);
+    if (modelsModalOpen) renderModelsModal();
+    return false;
   }
-  if (modelsModalOpen) renderModelsModal();
 }
 
 function openModelsModal() {
@@ -207,12 +210,13 @@ async function pollAll() {
     const data = await apiFetch('/api/status');
     const eng = data.engine || {};
     lastEngine = eng;
+    if (modelsModalOpen && data.host?.alive && eng.enabled && !eng.error && eng.active !== 'ollama') closeModelsModal();
     // A pending Ollama load means nothing once another engine (or none) runs.
     if (data.host?.alive && eng.enabled && !eng.error && eng.active !== 'ollama') clearPending();
     // /api/models is Ollama-only (409 with llama.cpp), so it waits for an Ollama view.
-    if (data.host?.alive && !modelListRequested && ollamaView(eng) && (eng.active === 'ollama' || !eng.enabled)) {
+    if (data.host?.alive && !modelListRequested && ollamaView(eng)) {
       modelListRequested = true;
-      refreshAvailableModels();
+      refreshAvailableModels().then(ok => { if (!ok) modelListRequested = false; });
     }
     renderStatus(data.host, data.ipmi, eng, data.engineApp);
     renderEngineSwitch(data.host, eng);
@@ -317,7 +321,7 @@ function renderEngineSwitch(host, eng) {
   warn.textContent = '';
   if (alive && eng.conflict) warn.appendChild(el('div', null, 'Both engines are running — pick one'));
   if (alive && eng.notFound) {
-    warn.appendChild(el('div', null, `llama.cpp app “${eng.notFound}” not found in TrueNAS`));
+    warn.appendChild(el('div', null, `llama.cpp app '${eng.notFound}' not found`));
   }
   warn.hidden = !warn.firstChild;
 
@@ -383,7 +387,12 @@ function renderModels(data, eng, host) {
   document.getElementById('btn-models').hidden = eng.enabled && eng.active !== 'ollama';
   speed.hidden = true;
 
-  if (llama && data && !data.error) { renderLlamacppModels(data, wrap, speed); return; }
+  if (llama && host?.alive) {
+    if (data && !data.error) { renderLlamacppModels(data, wrap, speed); return; }
+    wrap.textContent = '';
+    if (data?.error) wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable'));
+    return;
+  }
   if (!host?.alive || !data && eng.error) {
     wrap.textContent = '';
     wrap.appendChild(el('span', 'dim-text', host?.alive ? 'Temporarily unavailable' : 'Host unavailable'));
@@ -812,7 +821,7 @@ function renderEngineApp(data, eng, host, slots) {
   const memUsed = data.memory?.used ?? 0;
   const memMax  = data.memory?.max  ?? 0;
   memCard.appendChild(el('div', 'app-stat-val', fmt(memUsed)));
-  memCard.appendChild(el('div', 'app-stat-sub', `limit ${fmt(memMax)}`));
+  memCard.appendChild(el('div', 'app-stat-sub', memMax > 0 ? `limit ${fmt(memMax)}` : 'no limit'));
   const memPct = memMax > 0 ? Math.round(memUsed / memMax * 100) : 0;
   const memBarRow = el('div', 'app-bar-row');
   memBarRow.appendChild(makeGpuBar('', '', memPct, 'fill-vram'));
