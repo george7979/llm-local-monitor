@@ -1,8 +1,8 @@
 import { sshExec } from '../lib/ssh.js';
 import { cached } from '../lib/cache.js';
-import { cfg } from '../config.js';
+import { getApps } from './engineApps.js';
 
-let prevCpu = null; // { usec, ts }
+const prevCpu = new Map(); // app name -> { usec, ts }
 
 function parseSection(raw, name) {
   const parts = raw.split(/===\w+===/);
@@ -11,11 +11,11 @@ function parseSection(raw, name) {
   return idx >= 0 ? (parts[idx + 1] || '').trim() : '';
 }
 
-export function getOllamaAppStats() {
-  return cached('ollama-app', 2_000, async () => {
+export function getEngineAppStats(appName) {
+  return cached(`engine-app:${appName}`, 2_000, async () => {
     // ── 1. App info + container ID ──────────────────────────────────
-    const midcltRaw = await sshExec(`midclt call app.query '[["name","=","${cfg.ollamaAppName}"]]'`);
-    const app = JSON.parse(midcltRaw)[0];
+    const app = (await getApps()).find(a => a.name === appName);
+    if (!app) throw new Error(`App not found: ${appName}`);
     const containerId = app.active_workloads?.container_details?.[0]?.id;
 
     const base = {
@@ -52,13 +52,14 @@ export function getOllamaAppStats() {
     const cpuUsec = parseInt(cpu.match(/^usage_usec\s+(\d+)/m)?.[1] || 0);
     const now = Date.now();
     let cpuPct = 0;
-    if (prevCpu?.usec > 0) {
-      const du = cpuUsec - prevCpu.usec;
-      const dw = (now - prevCpu.ts) * 1000; // wall clock in µs
+    const prev = prevCpu.get(appName);
+    if (prev?.usec > 0) {
+      const du = cpuUsec - prev.usec;
+      const dw = (now - prev.ts) * 1000; // wall clock in µs
       // Divide by nproc to get % of total CPU (same as TrueNAS / docker stats)
       cpuPct = dw > 0 ? Math.max(0, Math.round((du / (dw * nproc)) * 100)) : 0;
     }
-    prevCpu = { usec: cpuUsec, ts: now };
+    prevCpu.set(appName, { usec: cpuUsec, ts: now });
 
     // Memory
     const memUsed = parseInt(mem) || 0;

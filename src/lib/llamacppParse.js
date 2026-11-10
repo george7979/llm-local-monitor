@@ -130,3 +130,35 @@ export function launchParams(command) {
   add('reasoning', flagValue(command, ['--reasoning-budget']));
   return out;
 }
+
+/** Overall activity across raw /slots entries: generating > reading > idle; null without slots. */
+export function overallActivity(slots) {
+  if (!Array.isArray(slots) || slots.length === 0) return null;
+  const all = slots.map(activity);
+  if (all.includes('generating')) return 'generating';
+  if (all.includes('reading')) return 'reading';
+  return 'idle';
+}
+
+/** True when a cumulative counter went down between two /metrics samples (server restarted). */
+export function countersWentBackwards(prevM, curM) {
+  if (!prevM || !curM) return false;
+  return ['tokens_predicted_total', 'tokens_predicted_seconds_total'].some(k =>
+    num(prevM[k]) != null && num(curM[k]) != null && curM[k] < prevM[k]);
+}
+
+/** live (sum over slots) -> last window -> lifetime -> null. `lives` holds per-slot tok/s or null. */
+export function pickSpeed(lives, last, lifetime) {
+  const found = lives.filter(v => v != null);
+  if (found.length) return { value: round1(found.reduce((a, b) => a + b, 0)), window: 'live' };
+  if (last?.speed != null) return { value: last.speed, window: 'last' };
+  if (lifetime?.speed != null) return { value: lifetime.speed, window: 'lifetime' };
+  return null;
+}
+
+/** last window -> lifetime -> null. */
+export function pickMtp(last, lifetime) {
+  if (last?.mtp != null) return { pct: last.mtp, window: 'last' };
+  if (lifetime?.mtp != null) return { pct: lifetime.mtp, window: 'lifetime' };
+  return null;
+}

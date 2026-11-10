@@ -4,7 +4,7 @@ import { getHostStatus } from './collectors/host.js';
 import { getIpmiStatus } from './collectors/ipmi.js';
 import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
-import { getOllamaAppStats } from './collectors/ollamaApp.js';
+import { getEngineAppStats } from './collectors/engineApp.js';
 import { getAvailableModels, findModel } from './collectors/ollamaModels.js';
 import { getGpuStatus } from './collectors/gpu.js';
 import { getGpuProcs } from './collectors/gpuProcs.js';
@@ -60,7 +60,7 @@ router.get('/status', async (_req, res) => {
     })) };
   }
 
-  const ollamaApp = host.alive ? await safeCollect(getOllamaAppStats) : null;
+  const ollamaApp = host.alive ? await safeCollect(() => getEngineAppStats(cfg.ollamaAppName)) : null;
   res.json({ host, ipmi, uptime, ollama, ollamaApp, gpu, gpuProcs, memory, network });
 });
 
@@ -73,7 +73,7 @@ router.get('/models', async (_req, res) => {
 });
 
 router.get('/ollama-app', async (_req, res) => {
-  res.json(await safeCollect(getOllamaAppStats));
+  res.json(await safeCollect(() => getEngineAppStats(cfg.ollamaAppName)));
 });
 
 router.get('/gpu', async (_req, res) => {

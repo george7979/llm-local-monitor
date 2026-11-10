@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMetrics, formatParams, mapModelRow, slotSample, liveSpeed, activity,
   requestWindow, lifetimeStats, contextFill, launchParams,
+  overallActivity, countersWentBackwards, pickSpeed, pickMtp,
 } from '../src/lib/llamacppParse.js';
 
 const METRICS = `# HELP llamacpp:prompt_tokens_total x
@@ -106,4 +107,37 @@ test('launchParams: long aliases, MTP without length, non-MTP spec', () => {
   ]);
   assert.deepEqual(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '4']), []);
   assert.deepEqual(launchParams(['-t']), []); // flag without value
+});
+
+test('overallActivity: generating beats reading beats idle; null without slots', () => {
+  const gen = { is_processing: true, next_token: [{ n_decoded: 5 }] };
+  const read = { is_processing: true, next_token: [{ n_decoded: 0 }] };
+  const idle = { is_processing: false };
+  assert.equal(overallActivity([idle, read, gen]), 'generating');
+  assert.equal(overallActivity([idle, read]), 'reading');
+  assert.equal(overallActivity([idle]), 'idle');
+  assert.equal(overallActivity([]), null);
+  assert.equal(overallActivity(undefined), null);
+});
+test('countersWentBackwards', () => {
+  const a = { tokens_predicted_total: 100, tokens_predicted_seconds_total: 10 };
+  assert.equal(countersWentBackwards(a, { tokens_predicted_total: 120, tokens_predicted_seconds_total: 12 }), false);
+  assert.equal(countersWentBackwards(a, a), false);
+  assert.equal(countersWentBackwards(a, { tokens_predicted_total: 5, tokens_predicted_seconds_total: 1 }), true);
+  assert.equal(countersWentBackwards(null, a), false);
+  assert.equal(countersWentBackwards(a, {}), false);
+});
+test('pickSpeed: live sum, then last, then lifetime, then null', () => {
+  assert.deepEqual(pickSpeed([10.5, null, 20], { speed: 5 }, { speed: 1 }), { value: 30.5, window: 'live' });
+  assert.deepEqual(pickSpeed([null], { speed: 5 }, { speed: 1 }), { value: 5, window: 'last' });
+  assert.deepEqual(pickSpeed([], { speed: null }, { speed: 1 }), { value: 1, window: 'lifetime' });
+  assert.deepEqual(pickSpeed([], null, { speed: 2 }), { value: 2, window: 'lifetime' });
+  assert.equal(pickSpeed([], null, { speed: null }), null);
+  assert.equal(pickSpeed([], null, null), null);
+});
+test('pickMtp: last, then lifetime, then null', () => {
+  assert.deepEqual(pickMtp({ mtp: 60 }, { mtp: 50 }), { pct: 60, window: 'last' });
+  assert.deepEqual(pickMtp({ mtp: null }, { mtp: 50 }), { pct: 50, window: 'lifetime' });
+  assert.deepEqual(pickMtp(null, { mtp: 0 }), { pct: 0, window: 'lifetime' });
+  assert.equal(pickMtp(null, { mtp: null }), null);
 });
