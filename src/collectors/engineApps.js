@@ -3,17 +3,23 @@ import { cached } from '../lib/cache.js';
 import { cfg } from '../config.js';
 import { pickEngine } from '../lib/engine.js';
 import { launchParams } from '../lib/llamacppParse.js';
+import { withPendingJobs, parseAppsAndJobs } from '../lib/truenasJobs.js';
 
 const SELECT = ['name', 'state', 'version', 'human_version', 'metadata',
   'upgrade_available', 'image_updates_available', 'active_workloads'];
 
-/** The only `app.query` per poll; every consumer of app state reads from here. */
-export function getApps() {
-  return cached('apps', 2_000, async () => {
-    const raw = await sshExec(`midclt call app.query '[]' '${JSON.stringify({ select: SELECT })}'`);
-    return JSON.parse(raw);
-  });
+/**
+ * The only `app.query` per poll, with the pending TrueNAS jobs in the same ssh
+ * command: `{ apps, jobs, jobsError }`. A failed job read leaves `jobs: null`
+ * and does not fail the app list.
+ */
+export function getAppsAndJobs() {
+  return cached('apps', 2_000, async () =>
+    parseAppsAndJobs(await sshExec(withPendingJobs(`midclt call app.query '[]' '${JSON.stringify({ select: SELECT })}'`))));
 }
+
+/** The app list; every consumer of app state reads from here. */
+export const getApps = async () => (await getAppsAndJobs()).apps;
 
 const summary = app => (app ? { state: app.state, upgradeAvailable: !!(app.upgrade_available || app.image_updates_available) } : null);
 

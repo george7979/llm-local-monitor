@@ -28,13 +28,14 @@ let switchLine = false;       // the action line currently shows a switching mes
 // Old Ollama view (v1.5.1) when llama.cpp is not configured.
 const ollamaView = eng => !eng.enabled || eng.active === 'ollama';
 
-// The active engine's own update flag; without the feature, the Ollama app's.
 // An engine action (switch, restart, update all apps) holds the server lock,
-// or a switch we sent has not shown up yet: no other engine action may start.
+// TrueNAS still runs a job on an engine app (`busy`), or a switch we sent has
+// not shown up yet: no other engine action may start.
 function engineBusy(eng) {
-  return !!eng?.switching || !!switchingTo;
+  return !!eng?.switching || !!eng?.busy || !!switchingTo;
 }
 
+// The active engine's own update flag; without the feature, the Ollama app's.
 function updatesWaiting(eng, app) {
   return eng.enabled ? !!eng.updatesWaiting : !!app?.upgradeAvailable;
 }
@@ -333,8 +334,9 @@ function renderEngineSwitch(host, eng) {
   }
   warn.hidden = !warn.firstChild;
 
-  // The switch POST answers once the start is queued; the success signal is
-  // the target showing up as the active engine.
+  // The switch POST answers once the start job has finished (container up,
+  // model possibly still loading); the success signal is the target showing
+  // up as the active engine.
   if (switchingTo && Date.now() - switchSentAt > SWITCH_GIVE_UP_MS) switchingTo = null;
   if (switchingTo && eng.active === switchingTo && !eng.switching && !eng.conflict) switchingTo = null;
   if (switchingTo) {
@@ -343,6 +345,10 @@ function renderEngineSwitch(host, eng) {
   } else if (eng.switching && eng.action !== 'upgrade') {
     // "Update all apps" reports on its own line; switch and restart use this one.
     setMsg(line, eng.action === 'restart' ? 'Restarting engine…' : 'Switching engine…');
+    switchLine = true;
+  } else if (eng.busy) {
+    // A TrueNAS job on an engine app (an upgrade, or one started in the TrueNAS UI).
+    setMsg(line, `TrueNAS: ${eng.busy.method} on ${eng.busy.app}…`);
     switchLine = true;
   } else if (switchLine) {
     setMsg(line, '');
@@ -1225,7 +1231,7 @@ async function action(name) {
   try {
     const res = await apiFetch(`/api/${name}`, { method: 'POST' });
     setMsg(msg, res.ok
-      ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-engine': 'Restart queued' }[name] || 'OK')
+      ? ({ wake: 'Sent — boot ~3.5 min', sleep: 'Shutting down...', 'restart-engine': 'Restarted' }[name] || 'OK')
       : 'Error: ' + (res.error || '?'), !res.ok);
   } catch (e) {
     setMsg(msg, 'Error: ' + e.message, true);

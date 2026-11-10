@@ -2,6 +2,7 @@ import { sshExec } from '../lib/ssh.js';
 import { cfg } from '../config.js';
 import { selectPending, skippedWithUpdate, upgradeSkipList } from '../lib/engine.js';
 import { acquireEngineLock } from '../lib/engineLock.js';
+import { withPendingJobs, parseAppsAndJobs, refuseWhileEngineJobs } from '../lib/truenasJobs.js';
 
 export { selectPending };
 
@@ -19,25 +20,29 @@ function jobId(raw) {
  * The app list — states included — is read here, at click time and under the
  * shared engine lock, rather than from the polled cache: the active engine
  * and the skip list must match the moment of the call, not a state a running
- * switch has already changed. With llama.cpp configured, an unreadable list
- * fails closed with HTTP 503 and nothing is upgraded.
+ * switch has already changed. With llama.cpp configured, the pending TrueNAS
+ * jobs are read in the same round trip: one still running on an engine app
+ * refuses with 409 (a redeploy in flight could start the stopped engine), and
+ * an unreadable app or job list fails closed with HTTP 503 — nothing is
+ * upgraded. Without llama.cpp, the v1.5.1 read: no job check.
  */
 export async function upgradeApps(exec = sshExec) {
   const release = acquireEngineLock('upgrade');
   try {
     const configured = !!cfg.llamacppAppName;
-    let all;
+    const names = { ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName };
+    const query = `midclt call app.query '[]' '{"select":["name","state","upgrade_available","image_updates_available"]}'`;
+    let all, read;
     try {
-      const raw = await exec(
-        `midclt call app.query '[]' '{"select":["name","state","upgrade_available","image_updates_available"]}'`
-      );
-      all = JSON.parse(raw);
+      const raw = await exec(configured ? withPendingJobs(query) : query);
+      read = configured ? parseAppsAndJobs(raw) : { apps: JSON.parse(raw) };
+      all = read.apps;
       if (!Array.isArray(all)) throw new Error('app.query did not return a list');
     } catch (err) {
       if (configured) throw Object.assign(new Error(`Cannot determine the active engine: ${err.message}`), { status: 503 });
       throw err;
     }
-    const names = { ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName };
+    if (configured) refuseWhileEngineJobs(read, names);
     const skip = upgradeSkipList(all, names, configured);
     const { charts, images } = selectPending(all, skip);
     const skippedNames = skippedWithUpdate(all, skip);

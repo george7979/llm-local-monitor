@@ -5,7 +5,7 @@ import { getIpmiStatus } from './collectors/ipmi.js';
 import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getEngineAppStats } from './collectors/engineApp.js';
-import { getApps, getEngineState, getLaunchInfo } from './collectors/engineApps.js';
+import { getAppsAndJobs, getEngineState, getLaunchInfo } from './collectors/engineApps.js';
 import { getLlamacppStatus } from './collectors/llamacpp.js';
 import { getAvailableModels, findModel } from './collectors/ollamaModels.js';
 import { getGpuStatus } from './collectors/gpu.js';
@@ -20,7 +20,7 @@ import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
-import { appVramBytes, buildEngine, engineAppName, annotateGpus, modelsSource } from './lib/engine.js';
+import { appVramBytes, buildEngine, engineAppName, annotateGpus, modelsSource, engineJobsPending } from './lib/engine.js';
 import { engineAction } from './lib/engineLock.js';
 
 export const router = Router();
@@ -37,22 +37,33 @@ const engineNames = () => ({ ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAp
 // llama.cpp configured but its app not found behaves as the feature off: the Ollama app.
 const appNameOf = engine => engineAppName(engine, engineNames(), !!engine.enabled);
 
-/** `engine.switching` = any engine action holds the lock; `engine.action` says which. */
-const engineOpts = () => ({ configured: !!cfg.llamacppAppName, switching: !!engineAction(), action: engineAction() });
+/**
+ * `engine.switching` = an engine action of this monitor holds the lock;
+ * `engine.action` says which; `engine.busy` = a TrueNAS job still running on
+ * an engine app (`{ app, method }`), null when none or when the job list
+ * could not be read.
+ */
+const engineOpts = (busy = null) => ({ configured: !!cfg.llamacppAppName, switching: !!engineAction(), action: engineAction(), busy });
+
+function busyFrom(jobs) {
+  const [job] = engineJobsPending(jobs ?? [], engineNames());
+  return job ? { app: job.app, method: job.method } : null;
+}
 
 /**
- * The GPU process list and the app list are read in parallel; the engine
- * state needs both (the conflict tie-break uses the process list). A failed
+ * The GPU process list and the app list (with the pending TrueNAS jobs, same
+ * ssh command) are read in parallel; the engine state needs both (the
+ * conflict tie-break uses the process list). A failed
  * process collector means "no GPU holders", not a failed call — `gpuProcs` is
  * still returned as-is (with its `error`) for the UI.
  */
 function readEngine() {
   const gpuProcs = safeCollect(getGpuProcs);
-  const apps = safeCollect(getApps);
-  const engine = Promise.all([gpuProcs, apps]).then(async ([g, a]) => {
+  const read = safeCollect(getAppsAndJobs);
+  const engine = Promise.all([gpuProcs, read]).then(async ([g, r]) => {
     const procs = g.procs ?? [];
-    const state = a.error ? a : await safeCollect(() => getEngineState(procs, a));
-    return { engine: buildEngine(state, engineOpts()), procs };
+    const state = r.error ? r : await safeCollect(() => getEngineState(procs, r.apps));
+    return { engine: buildEngine(state, engineOpts(r.error ? null : busyFrom(r.jobs))), procs };
   });
   return { gpuProcs, engine };
 }

@@ -58,13 +58,14 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama or llama.cpp, one a
 - `src/lib/ssh.js` — `sshExec(cmd)` → promisified execFile with SSH args
 - `src/collectors/` — always return cached data (`cached('key', 2000, fn)`)
 - `src/collectors/ollama.js` — uses Ollama REST API (`/api/ps`), NOT SSH
-- `src/collectors/engineApps.js` — the single `app.query` per poll (`getApps()`, cached 2 s) and `getEngineState` (active engine, conflict, update flag); `getLaunchInfo` reads llama.cpp launch flags from `app.config` (cached 60 s)
+- `src/collectors/engineApps.js` — the single `app.query` per poll, with the pending TrueNAS jobs in the same ssh command (`getAppsAndJobs()`, cached 2 s; `getApps()` = its app list) and `getEngineState` (active engine, conflict, update flag); `getLaunchInfo` reads llama.cpp launch flags from `app.config` (cached 60 s)
 - `src/collectors/engineApp.js` — active engine app: state from `getApps()` + cgroup files over SSH (CPU/RAM/IO/Net)
 - `src/collectors/llamacpp.js` — llama-server HTTP (`/props`, `/v1/models`, `/slots`, `/metrics`); keeps the between-poll state, transitions in pure `advance()` of `src/lib/llamacppParse.js`
-- `src/lib/engine.js` — pure engine logic, no imports: `pickEngine`, `buildEngine`, `switchPlan`, `restartTarget`, `upgradeSkipList`, `modelsSource`, `annotateGpus`; unit-tested
-- `src/lib/engineLock.js` — the one in-memory lock shared by switch, restart and upgrade-apps (409 while another holds it); `engine.switching` / `engine.action` report it
-- `src/actions/switchEngine.js` / `restartEngine.js` — fresh `app.query` under the lock; switch stops the other app (awaited), waits 3 s, starts the target; restart stops (awaited), 3 s, starts. These and `upgradeApps` take an injectable `exec` — tests must always pass a fake, the default reaches the live server
-- `src/actions/upgradeApps.js` — fresh `app.query` (with `state`) under the lock; skips every engine app that is not the active one; 503 when it cannot be read (llama.cpp configured)
+- `src/lib/engine.js` — pure engine logic, no imports: `pickEngine`, `buildEngine`, `switchPlan`, `restartTarget`, `upgradeSkipList`, `modelsSource`, `annotateGpus`, `engineJobsPending` (TrueNAS jobs still WAITING/RUNNING that act on an engine app, exact app-name match); unit-tested
+- `src/lib/truenasJobs.js` — appends `core.get_jobs` to an `app.query` command (one ssh round trip; a failed job read does not fail the app list), parses the output, `refuseWhileEngineJobs` (409 pending job / 503 unreadable). Used by the three engine actions and `getAppsAndJobs()` → `engine.busy`
+- `src/lib/engineLock.js` — the one in-memory lock shared by switch, restart and upgrade-apps (409 while another holds it); `engine.switching` / `engine.action` report it. It only sees this monitor's requests — TrueNAS jobs are checked separately (above)
+- `src/actions/switchEngine.js` / `restartEngine.js` — fresh `app.query` + pending jobs under the lock; switch stops the other app (awaited), waits 3 s, starts the target (awaited); restart stops (awaited), 3 s, starts (awaited). These and `upgradeApps` take an injectable `exec` — tests must always pass a fake, the default reaches the live server
+- `src/actions/upgradeApps.js` — fresh `app.query` (with `state`) under the lock; skips every engine app that is not the active one; with llama.cpp configured also the job check, 503 when either list cannot be read
 - `src/collectors/gpuProcs.js` — per-GPU process list via SSH (nvidia-smi + /proc cgroup + midclt app.query); container/app name enrichment; per-GPU `engine` is derived from it in `routes.js` (match by app name only, never binary name)
 - `src/collectors/ollamaModels.js` — installed models via Ollama REST `/api/tags`; exports pure `mapTags` / `findModel` (unit-tested in `test/`)
 - `src/lib/ollamaClient.js` — `POST /api/generate` with a long-timeout dispatcher, separate from the collectors' 8 s one; used only by model actions

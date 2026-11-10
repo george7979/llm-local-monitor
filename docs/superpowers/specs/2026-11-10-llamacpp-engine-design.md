@@ -96,17 +96,21 @@ active engine's segment is highlighted.
 - Clicking the inactive segment asks for confirmation ("Switch to llama.cpp?
   Ollama will be stopped and its loaded models unloaded.") and then switches.
 - Both segments are disabled while the server is executing an engine action
-  (switch, restart or Update all apps — see Switching) and while the engine
-  state cannot be read. After that the target is simply the active
+  (switch, restart or Update all apps — see Switching), while TrueNAS still
+  runs a job on an engine app (`engine.busy`) and while the engine state cannot
+  be read. After that the target is simply the active
   engine in whatever state TrueNAS reports — DEPLOYING shows as "Starting…" on
   its cards — and the switch is usable again, so the owner can back out of a
   long model load or a crash at any time.
 - **Restart Ollama** becomes **Restart <engine>** and acts on the active engine
   in any state (RUNNING, DEPLOYING, CRASHED); disabled when none is active. It
-  waits for the stop job, then 3 s, then starts the app.
-- Switch, restart and Update all apps share one server-side lock: while one
-  runs, the others answer HTTP 409 and their buttons (and the update badge) are
-  disabled.
+  waits for the stop job, then 3 s, then starts the app and waits for the start
+  job.
+- Switch, restart and Update all apps refuse (HTTP 409) while another of them
+  runs in the monitor (one server-side lock) or while TrueNAS still has a job
+  running on an engine app; their buttons (and the update badge) are disabled
+  meanwhile, and the SERVER card's status line reads `TrueNAS: <method> on
+  <app>…` for such a job.
 - **Update all apps** never touches an engine app that is not the active one
   (both are left alone when none is active): upgrading a stopped app may start
   it, which would put both engines on the same GPUs. An inactive engine is
@@ -218,18 +222,35 @@ already keeps its previous sample.
 
 1. Reject if the host is down, the target is unknown, the feature is off, or
    another engine action (switch, restart, Update all apps) is running
-   (HTTP 409). The target app still STOPPING is refused too (HTTP 409, "<App>
-   is still stopping — try again in a moment"): it would finish stopping after
-   the switch and leave no engine.
+   (HTTP 409). Under the lock, read the engine app states and the TrueNAS jobs
+   still WAITING or RUNNING in one ssh round trip. A job that can start, stop
+   or redeploy an engine app (`app.start`, `app.stop`, `app.redeploy`,
+   `app.update`, `app.upgrade`, `app.upgrade_bulk`, `app.pull_images`,
+   `app.rollback`, `app.delete`, matched by exact app name in its arguments)
+   refuses the switch (HTTP 409, "TrueNAS is still working on <app> (<method>)
+   — try again when it finishes"); a job list that cannot be read refuses it
+   with HTTP 503. The target app still STOPPING is refused too (HTTP 409,
+   "<App> is still stopping — try again in a moment"): it would finish stopping
+   after the switch and leave no engine.
 2. Stop the other engine's app if it is not STOPPED; wait for the stop job.
 3. Wait 3 s (GPU release — the same gap the restart action uses).
-4. Start the target app.
-5. Respond once the start is queued. The UI treats the target app reaching
-   RUNNING in the regular poll as the success signal, not the HTTP response.
+4. Start the target app; wait for the start job (`midclt call -j`, 120 s).
+5. Respond once the start job has finished: the container is up, the model may
+   still be loading. The UI treats the target app showing up as the active
+   engine in the regular poll as the success signal, not the HTTP response.
 
 `engine.switching` reports the in-memory engine-action lock (`engine.action`
 names its holder: switch, restart or upgrade); for a switch it is held from the
-fresh state read through step 5.
+fresh state read through step 5. Restart and Update all apps (with llama.cpp
+configured) make the same TrueNAS-job check under the lock.
+
+`engine.busy` reports a TrueNAS job still running on an engine app as
+`{ app, method }` (null when none, or when the job list could not be read — the
+actions still fail closed on their own fresh read). It comes from the polled
+app list's ssh command, so the poll gains no round trip, and it covers jobs
+started outside the monitor (the TrueNAS UI, the upgrade jobs Update all apps
+leaves running). While it is set the UI disables the switch, Restart, Update
+all apps and the update badge.
 It is not persisted and has no timeout of its own beyond the SSH command's; a
 monitor restart clears it, and the next poll shows the real app states.
 
@@ -265,7 +286,7 @@ Test fixtures use these shapes with made-up values (`model-a`, round numbers).
 Following the v1.5.0 precedent, renamed routes get no alias.
 
 - `/api/status`: `ollama` → `models`, `ollamaApp` → `engineApp`; new `engine`
-  object: `{ active, switching, action, conflict, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`;
+  object: `{ active, switching, action, busy, conflict, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`;
   per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). With llama.cpp
   active, `models` also carries `speed` and `mtp`.
 - `POST /api/restart-ollama` → `POST /api/restart-engine`.

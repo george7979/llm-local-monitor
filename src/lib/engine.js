@@ -73,14 +73,52 @@ export function appVramBytes(procs, appName) {
  * carries only `ollama`. An unusable state degrades to "no engine, switch off"
  * so the UI can disable the control instead of failing the whole poll.
  */
-export function buildEngine(state, { configured, switching, action = null }) {
+export function buildEngine(state, { configured, switching, action = null, busy = null }) {
   if (!state || state.error) {
     // The app cannot be checked, so `enabled` reflects configuration alone.
     return { active: null, conflict: false, notFound: null, apps: {}, updatesWaiting: false,
-      switching, action, enabled: configured, ...(state?.error ? { error: state.error } : {}) };
+      switching, action, busy, enabled: configured, ...(state?.error ? { error: state.error } : {}) };
   }
   const apps = configured ? state.apps : { ollama: state.apps.ollama };
-  return { ...state, apps, switching, action, enabled: configured && !!state.apps.llamacpp };
+  return { ...state, apps, switching, action, busy, enabled: configured && !!state.apps.llamacpp };
+}
+
+// TrueNAS job methods that can start, stop or redeploy an app.
+const APP_JOB_METHODS = new Set(['app.start', 'app.stop', 'app.redeploy', 'app.update', 'app.upgrade',
+  'app.upgrade_bulk', 'app.pull_images', 'app.rollback', 'app.delete']);
+const JOB_PENDING_STATES = new Set(['WAITING', 'RUNNING']);
+
+/** The engine app a job argument names: a string, an object's `app_name`, or either inside (nested) arrays. */
+function argumentApp(arg, wanted) {
+  if (typeof arg === 'string') return wanted.has(arg) ? arg : null;
+  if (Array.isArray(arg)) {
+    for (const a of arg) {
+      const name = argumentApp(a, wanted);
+      if (name) return name;
+    }
+    return null;
+  }
+  if (arg && typeof arg === 'object' && typeof arg.app_name === 'string') return wanted.has(arg.app_name) ? arg.app_name : null;
+  return null;
+}
+
+/**
+ * TrueNAS jobs (`core.get_jobs` rows) still WAITING or RUNNING that act on an
+ * engine app — while one runs, it can start an engine behind a switch's back.
+ * Exact app-name equality only; object values other than `app_name` are not
+ * searched (an `app.update` carries the whole compose config). `names` =
+ * `{ ollama, llamacpp }`, llamacpp may be null. Malformed rows are ignored.
+ */
+export function engineJobsPending(jobs, names) {
+  if (!Array.isArray(jobs)) return [];
+  const wanted = new Set([names.ollama, names.llamacpp].filter(n => typeof n === 'string' && n));
+  const pending = [];
+  for (const job of jobs) {
+    if (!job || !JOB_PENDING_STATES.has(job.state) || !APP_JOB_METHODS.has(job.method) || !Array.isArray(job.arguments)) continue;
+    const app = argumentApp(job.arguments, wanted);
+    if (app) pending.push({ id: job.id, method: job.method, app });
+  }
+  return pending;
 }
 
 /**

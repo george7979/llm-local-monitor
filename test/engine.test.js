@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList, modelsSource } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList, modelsSource, engineJobsPending } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -190,4 +190,73 @@ test('modelsSource: Ollama whenever llama.cpp is not enabled, else the active en
   assert.equal(modelsSource(on('llamacpp')), 'llamacpp');
   // configured, app list unreadable: no engine known
   assert.equal(modelsSource(buildEngine({ error: 'ssh down' }, { configured: true, switching: false })), null);
+});
+
+// Rows shaped like real `midclt call core.get_jobs` output (placeholder names).
+const job = (method, args, state = 'RUNNING', id = 7) => ({ id, method, state, arguments: args });
+
+test('engineJobsPending: every argument shape names the app', () => {
+  const rows = [
+    job('app.start', ['ollama'], 'RUNNING', 1),                                   // string argument
+    job('app.update', ['llama-cpp', { custom_compose_config: '***' }], 'WAITING', 2), // string + config object
+    job('app.upgrade_bulk', [[{ app_name: 'app-a' }, { app_name: 'ollama' }]], 'RUNNING', 3), // array of objects
+    job('app.upgrade', [{ app_name: 'llama-cpp' }], 'RUNNING', 4),                // object with app_name
+    job('app.delete', [[['ollama']]], 'RUNNING', 5),                              // nested arrays
+  ];
+  assert.deepEqual(engineJobsPending(rows, N), [
+    { id: 1, method: 'app.start', app: 'ollama' },
+    { id: 2, method: 'app.update', app: 'llama-cpp' },
+    { id: 3, method: 'app.upgrade_bulk', app: 'ollama' },
+    { id: 4, method: 'app.upgrade', app: 'llama-cpp' },
+    { id: 5, method: 'app.delete', app: 'ollama' },
+  ]);
+});
+
+test('engineJobsPending: every listed method counts', () => {
+  for (const m of ['app.start', 'app.stop', 'app.redeploy', 'app.update', 'app.upgrade', 'app.upgrade_bulk',
+    'app.pull_images', 'app.rollback', 'app.delete']) {
+    assert.equal(engineJobsPending([job(m, ['ollama'])], N).length, 1, m);
+  }
+});
+
+test('engineJobsPending: finished jobs, other apps and other methods are ignored', () => {
+  for (const s of ['SUCCESS', 'FAILED', 'ABORTED']) assert.deepEqual(engineJobsPending([job('app.start', ['ollama'], s)], N), []);
+  assert.deepEqual(engineJobsPending([job('app.start', ['app-a'])], N), []);
+  assert.deepEqual(engineJobsPending([job('app.metadata.generate', ['ollama'])], N), []);
+  assert.deepEqual(engineJobsPending([job('app.query', ['ollama'])], N), []);
+});
+
+test('engineJobsPending: exact names only, never a substring', () => {
+  const names = { ollama: 'ollama', llamacpp: 'llama' };
+  assert.deepEqual(engineJobsPending([job('app.start', ['ollama-x'])], names), []);
+  assert.deepEqual(engineJobsPending([job('app.start', [{ app_name: 'my-llama' }])], names), []);
+  assert.deepEqual(engineJobsPending([job('app.start', ['ollama'])], names).map(j => j.app), ['ollama']);
+  assert.deepEqual(engineJobsPending([job('app.start', ['llama'])], names).map(j => j.app), ['llama']);
+});
+
+test('engineJobsPending: null llama.cpp name never matches', () => {
+  const names = { ollama: 'ollama', llamacpp: null };
+  assert.deepEqual(engineJobsPending([job('app.start', [null]), job('app.start', [{}]), job('app.start', [{ app_name: null }])], names), []);
+  assert.deepEqual(engineJobsPending([job('app.start', ['llama-cpp'])], names), []);
+  assert.equal(engineJobsPending([job('app.stop', ['ollama'])], names).length, 1);
+});
+
+test('engineJobsPending: object values are not searched, only app_name', () => {
+  assert.deepEqual(engineJobsPending([job('app.update', ['app-a', { values: 'ollama', other: ['ollama'] }])], N), []);
+});
+
+test('engineJobsPending: malformed rows are ignored', () => {
+  const rows = [null, 'x', {}, { method: 'app.start', state: 'RUNNING' },
+    { method: 'app.start', state: 'RUNNING', arguments: 'ollama' },
+    { method: 'app.start', state: 'RUNNING', arguments: { app_name: 'ollama' } }];
+  assert.deepEqual(engineJobsPending(rows, N), []);
+  assert.deepEqual(engineJobsPending(null, N), []);
+});
+
+test('buildEngine: busy is passed through, null by default, also without a state', () => {
+  const busy = { app: 'ollama', method: 'app.upgrade' };
+  assert.deepEqual(buildEngine(state, { configured: true, switching: false, busy }).busy, busy);
+  assert.equal(buildEngine(state, { configured: true, switching: false }).busy, null);
+  assert.deepEqual(buildEngine({ error: 'boom' }, { configured: false, switching: false, busy }).busy, busy);
+  assert.equal(buildEngine(null, { configured: true, switching: false }).busy, null);
 });
