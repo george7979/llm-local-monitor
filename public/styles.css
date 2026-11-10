@@ -484,15 +484,14 @@ tbody tr:last-child td { border-bottom: none; }
 .app-update-badge.clickable { cursor: pointer; }
 .app-update-badge.clickable:hover { background: rgba(245,158,11,.2); border-color: rgba(245,158,11,.5); }
 
-.app-rows {
-  display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; row-gap: 5px; margin-top: 4px;
-}
+.app-rows { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.app-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.app-col { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .app-row {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
   font-family: var(--mono); font-size: 12px; line-height: 1.5; min-width: 0;
   border-bottom: 1px solid var(--border); padding-bottom: 3px;
 }
-.app-row.wide { grid-column: 1 / -1; }
 .app-row-key {
   font-family: var(--ui); font-size: 9px; font-weight: 600; letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim); flex-shrink: 0;

@@ -764,39 +764,48 @@ function renderNoEngineApps(eng, wrap) {
 }
 
 // One "KEY  value" line of the engine app card.
-function appRow(key, value, title, wide = false) {
-  const row = el('div', wide ? 'app-row wide' : 'app-row');
+function appRow(key, value, title) {
+  const row = el('div', 'app-row');
   row.appendChild(el('span', 'app-row-key', key));
   row.appendChild(el('span', 'app-row-val', value));
   if (title) row.title = title;
   return row;
 }
 
-// The card's entries, laid out in two columns (context spans both). An entry
-// whose data is missing is left out.
-function appRows(data, slots, llama) {
-  const rows = [];
+// Launch parameters that describe the host side of the engine; the rest
+// describe how the model is run.
+const HOST_PARAMS = new Set(['threads', 'slots']);
+
+// The card's entries: context across the full width, then two columns —
+// left "host and load" (CPU, RAM, threads, slots), right "how the model runs"
+// (split, MTP, KV cache, batch, reasoning). An entry whose data is missing is
+// left out.
+function appEntries(data, slots, llama) {
+  const wide = [], left = [], right = [];
   if (data.cpu) {
-    rows.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
+    left.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
       'Share of all host cores used by the app container'));
   }
   if (data.memory?.used) {
     const { used, max } = data.memory;
-    rows.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used)));
+    left.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used)));
   }
-  if (!llama) return rows;
-  (slots || []).forEach((sl, i) => {
-    if (!sl.total) return;
-    const pct = Math.round(sl.used / sl.total * 100);
-    rows.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
-      `${fmtK(sl.used)} / ${fmtK(sl.total)} · ${pct}%${sl.cached ? ` · cache ${fmtK(sl.cached)}` : ''}`,
-      `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`, true));
-  });
-  // Launch parameters, read-only; the full command is the tooltip.
-  for (const p of data.launch?.params || []) {
-    rows.push(appRow(p.label, p.value, data.launch.command || ''));
+  if (llama) {
+    (slots || []).forEach((sl, i) => {
+      if (!sl.total) return;
+      const pct = Math.round(sl.used / sl.total * 100);
+      wide.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
+        `${fmtK(sl.used)} / ${fmtK(sl.total)} · ${pct}%${sl.cached ? ` · cache ${fmtK(sl.cached)}` : ''}`,
+        `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`));
+    });
+    // Launch parameters, read-only; the full command is the tooltip.
+    for (const p of data.launch?.params || []) {
+      (HOST_PARAMS.has(p.label) ? left : right).push(appRow(p.label, p.value, data.launch.command || ''));
+    }
   }
-  return rows;
+  // Nothing for the right column (Ollama): CPU and RAM sit side by side.
+  if (!right.length && left.length > 1) right.push(left.pop());
+  return { wide, left, right };
 }
 
 function renderEngineApp(data, eng, host, slots) {
@@ -834,7 +843,15 @@ function renderEngineApp(data, eng, host, slots) {
   wrap.appendChild(statusRow);
 
   const list = el('div', 'app-rows');
-  appRows(data, slots, eng.active === 'llamacpp').forEach(r => list.appendChild(r));
+  const { wide, left, right } = appEntries(data, slots, eng.active === 'llamacpp');
+  wide.forEach(r => list.appendChild(r));
+  const cols = el('div', 'app-cols');
+  for (const entries of [left, right]) {
+    const col = el('div', 'app-col');
+    entries.forEach(r => col.appendChild(r));
+    cols.appendChild(col);
+  }
+  list.appendChild(cols);
   wrap.appendChild(list);
 }
 

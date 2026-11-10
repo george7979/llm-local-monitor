@@ -128,17 +128,20 @@ active engine's segment is highlighted.
 ### App card
 
 Title follows the engine: `OLLAMA APP` / `LLAMA.CPP APP`. Under the state and
-update badges the card lists `KEY  value` entries in two columns; the context
-entry spans both. An entry whose data is missing is left out. The update badge
-works as today.
+update badges the card lists `KEY  value` entries: context across the full
+width, then two columns grouped by subject — left, the host side (CPU, RAM,
+slots, threads); right, how the model is run (split, speculative decoding, KV
+cache, batch, reasoning). An entry whose data is missing is left out; with
+nothing for the right column (Ollama), CPU and RAM sit side by side. The update
+badge works as today.
 
 ```
-CPU   4% · 24 cores    RAM          9.7 GB
 CONTEXT         52k / 128k · 41% · cache 48k
-SPLIT        tensor    MTP              ×3
-SLOTS             1    THREADS           8
-KV             q8_0    BATCH    2048 / 512
-REASONING      2048
+CPU   4% · 24 cores    SPLIT        tensor
+RAM          9.7 GB    MTP              ×3
+SLOTS             1    KV             q8_0
+THREADS           8    BATCH    2048 / 512
+                       REASONING      2048
 ```
 
 `CPU` and `RAM` come from the active app's container for either engine (`RAM`
