@@ -216,6 +216,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 13 | README and PRD FR2.3 describe the refusal rule (in-monitor lock plus TrueNAS jobs) instead of "never overlap" | ✅ Done |
 | 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ⬜ Open |
 | 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
+| 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ⬜ Open |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
