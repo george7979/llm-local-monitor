@@ -58,9 +58,14 @@ With llama.cpp active:
   Ollama features and are hidden.
 - **Llama.cpp App** adds context fill per slot and the server's launch parameters, read from
   the app's TrueNAS configuration.
-- **Restart <engine>** acts on whichever engine is active.
+- **Restart <engine>** acts on whichever engine is active: it waits for the stop to finish,
+  pauses 3 s for the GPUs, then starts the app again.
 - **Update all apps** upgrades every app with an update waiting except engine apps that are not
-  the active one (upgrading a stopped app could start it). It is enabled by the *active*
+  the active one (upgrading a stopped app could start it); the active engine is read fresh at
+  click time.
+- Switch, restart and **Update all apps** never overlap: while one runs the others are greyed
+  out and the server refuses them (HTTP 409). Switching to an engine whose app is still
+  stopping is refused until it has stopped. It is enabled by the *active*
   engine's update flag; a llama.cpp app pinned by image digest never reports one, so with it
   active the button stays grey.
 
@@ -71,8 +76,9 @@ LLAMACPP_APP_NAME=llama-cpp                # TrueNAS app name; unset = llama.cpp
 # LLAMACPP_BASE_URL=http://<LLM_HOST>:8080 # default
 ```
 
-Start `llama-server` with `--metrics` (and leave `/slots` enabled, the default); without them
-speed and MTP show `—`. Without `LLAMACPP_APP_NAME` the dashboard is Ollama-only.
+Start `llama-server` with `--metrics` (and leave `/slots` enabled, the default). Live speed comes
+from `/slots`; without `--metrics` the idle speed shows `—` and the MTP figure is left out.
+Without `LLAMACPP_APP_NAME` the dashboard is Ollama-only.
 
 ## Managing what sits in VRAM
 

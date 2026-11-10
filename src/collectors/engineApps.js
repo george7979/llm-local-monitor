@@ -17,9 +17,13 @@ export function getApps() {
 
 const summary = app => (app ? { state: app.state, upgradeAvailable: !!(app.upgrade_available || app.image_updates_available) } : null);
 
-/** `procs` = rows from getGpuProcs() (`container` is the TrueNAS app name). */
-export async function getEngineState(procs) {
-  const apps = await getApps();
+/**
+ * `procs` = rows from getGpuProcs() (`container` is the TrueNAS app name);
+ * `apps` = getApps()' list when the caller already has it (routes.js reads
+ * both in parallel; `cached()` does not share an in-flight call).
+ */
+export async function getEngineState(procs, apps) {
+  apps ??= await getApps();
   const byName = name => (name ? apps.find(a => a.name === name) : undefined);
   const ollama = byName(cfg.ollamaAppName);
   const llamacpp = byName(cfg.llamacppAppName);

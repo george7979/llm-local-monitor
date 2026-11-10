@@ -67,19 +67,20 @@ export function appVramBytes(procs, appName) {
 
 /**
  * The `engine` object of /api/status. `state` is getEngineState()'s result (or
- * a collector `{ error }`); `configured` = LLAMACPP_APP_NAME is set. `enabled`
+ * a collector `{ error }`); `configured` = LLAMACPP_APP_NAME is set;
+ * `switching` = an engine action holds the lock, `action` = which one. `enabled`
  * means llama.cpp is configured AND its app exists. Unconfigured → `apps`
  * carries only `ollama`. An unusable state degrades to "no engine, switch off"
  * so the UI can disable the control instead of failing the whole poll.
  */
-export function buildEngine(state, { configured, switching }) {
+export function buildEngine(state, { configured, switching, action = null }) {
   if (!state || state.error) {
     // The app cannot be checked, so `enabled` reflects configuration alone.
     return { active: null, conflict: false, notFound: null, apps: {}, updatesWaiting: false,
-      switching, enabled: configured, ...(state?.error ? { error: state.error } : {}) };
+      switching, action, enabled: configured, ...(state?.error ? { error: state.error } : {}) };
   }
   const apps = configured ? state.apps : { ollama: state.apps.ollama };
-  return { ...state, apps, switching, enabled: configured && !!state.apps.llamacpp };
+  return { ...state, apps, switching, action, enabled: configured && !!state.apps.llamacpp };
 }
 
 /**
@@ -100,12 +101,43 @@ export function skippedWithUpdate(apps, skip) {
 }
 
 /**
- * App the app card and restart act on. Unconfigured: always the Ollama app,
- * whatever its state (v1.5.1). Configured: the active engine's app, else null.
+ * App the app card acts on. `enabled` = llama.cpp configured AND its app
+ * exists (engine.enabled). Not enabled: always the Ollama app, whatever its
+ * state (v1.5.1). Enabled: the active engine's app, else null.
  */
-export function engineAppName(engine, names, configured) {
-  if (!configured) return names.ollama;
+export function engineAppName(engine, names, enabled) {
+  if (!enabled) return names.ollama;
   return engine?.active ? names[engine.active] : null;
+}
+
+const appByName = (apps, name) => (name ? apps.find(a => a.name === name) : undefined);
+
+/**
+ * The app a restart acts on, from fresh app states (`[{ name, state }]`).
+ * llama.cpp not configured or its app missing: the Ollama app, whatever its
+ * state. Otherwise the active engine (GPU holder on a conflict), `name: null`
+ * when none is active.
+ */
+export function restartTarget(apps, procs, names, configured) {
+  const ollama = appByName(apps, names.ollama);
+  const llamacpp = configured ? appByName(apps, names.llamacpp) : undefined;
+  if (!llamacpp) return { name: names.ollama, state: ollama?.state ?? null };
+  const { active } = pickEngine({ ollama, llamacpp }, procs, names);
+  if (!active) return { name: null, state: null };
+  return { name: names[active], state: (active === 'ollama' ? ollama : llamacpp).state };
+}
+
+/**
+ * Engine apps "Update all apps" leaves alone, from fresh app states. llama.cpp
+ * not configured or its app missing: none (v1.5.1). Otherwise every engine app
+ * that is not the active one — both when none is active, and both on a
+ * conflict, where no GPU process list is at hand to pick the winner.
+ */
+export function upgradeSkipList(apps, names, configured) {
+  const llamacpp = configured ? appByName(apps, names.llamacpp) : undefined;
+  if (!llamacpp) return [];
+  const { active, conflict } = pickEngine({ ollama: appByName(apps, names.ollama), llamacpp }, [], names);
+  return skipListFor({ active: conflict ? null : active }, names, true);
 }
 
 /** Copies of the GPU cards with the engine holding each GPU (never mutates the cached originals). */
@@ -120,15 +152,19 @@ export function annotateGpus(gpu, procs, names) {
 /**
  * What a switch has to do, from fresh app states (`[{ name, state }]`):
  * stop the other engine unless STOPPED, start the target only if STOPPED.
- * Nothing to do = no-op. `missing` = the target app does not exist.
+ * Nothing to do = no-op. `missing` = an engine app does not exist.
+ * `stopping` = the target is still STOPPING: it would finish stopping after
+ * the switch and leave no engine, so the switch must refuse.
  */
 export function switchPlan(apps, target, names) {
   const targetName = names[target];
   const otherName = names[target === 'ollama' ? 'llamacpp' : 'ollama'];
   const stateOf = name => apps.find(a => a.name === name)?.state;
+  const targetState = stateOf(targetName);
   const otherState = stateOf(otherName);
-  if (!stateOf(targetName) || !otherState) return { missing: true, stop: null, start: null, noop: false };
-  const stop = otherState && otherState !== 'STOPPED' ? otherName : null;
-  const start = stateOf(targetName) === 'STOPPED' ? targetName : null;
-  return { missing: false, stop, start, noop: !stop && !start };
+  if (!targetState || !otherState) return { missing: true, stopping: false, stop: null, start: null, noop: false };
+  if (targetState === 'STOPPING') return { missing: false, stopping: true, stop: null, start: null, noop: false };
+  const stop = otherState !== 'STOPPED' ? otherName : null;
+  const start = targetState === 'STOPPED' ? targetName : null;
+  return { missing: false, stopping: false, stop, start, noop: !stop && !start };
 }

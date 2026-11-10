@@ -5,7 +5,7 @@ import { getIpmiStatus } from './collectors/ipmi.js';
 import { getUptime } from './collectors/uptime.js';
 import { getOllamaStatus } from './collectors/ollama.js';
 import { getEngineAppStats } from './collectors/engineApp.js';
-import { getEngineState, getLaunchInfo } from './collectors/engineApps.js';
+import { getApps, getEngineState, getLaunchInfo } from './collectors/engineApps.js';
 import { getLlamacppStatus } from './collectors/llamacpp.js';
 import { getAvailableModels, findModel } from './collectors/ollamaModels.js';
 import { getGpuStatus } from './collectors/gpu.js';
@@ -15,12 +15,13 @@ import { getNetworkStatus } from './collectors/network.js';
 import { wakeServer } from './actions/wake.js';
 import { sleepServer } from './actions/sleep.js';
 import { restartEngine } from './actions/restartEngine.js';
-import { switchEngine, isSwitching } from './actions/switchEngine.js';
+import { switchEngine } from './actions/switchEngine.js';
 import { upgradeApps } from './actions/upgradeApps.js';
 import { checkUpdate } from './actions/checkUpdate.js';
 import { loadModel } from './actions/loadModel.js';
 import { unloadModel } from './actions/unloadModel.js';
-import { appVramBytes, buildEngine, skipListFor, engineAppName, annotateGpus } from './lib/engine.js';
+import { appVramBytes, buildEngine, engineAppName, annotateGpus } from './lib/engine.js';
+import { engineAction } from './lib/engineLock.js';
 
 export const router = Router();
 
@@ -33,26 +34,36 @@ function safeCollect(fn) {
 }
 
 const engineNames = () => ({ ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName });
-const appNameOf = engine => engineAppName(engine, engineNames(), !!cfg.llamacppAppName);
+// llama.cpp configured but its app not found behaves as the feature off: the Ollama app.
+const appNameOf = engine => engineAppName(engine, engineNames(), !!engine.enabled);
+
+/** `engine.switching` = any engine action holds the lock; `engine.action` says which. */
+const engineOpts = () => ({ configured: !!cfg.llamacppAppName, switching: !!engineAction(), action: engineAction() });
 
 /**
- * GPU holders first, then engine state: the conflict tie-break needs the
- * process list. A failed process collector means "no GPU holders", not a failed
- * call — `gpuProcs` is still returned as-is (with its `error`) for the UI.
+ * The GPU process list and the app list are read in parallel; the engine
+ * state needs both (the conflict tie-break uses the process list). A failed
+ * process collector means "no GPU holders", not a failed call — `gpuProcs` is
+ * still returned as-is (with its `error`) for the UI.
  */
 function readEngine() {
   const gpuProcs = safeCollect(getGpuProcs);
-  const engine = gpuProcs.then(async g => {
+  const apps = safeCollect(getApps);
+  const engine = Promise.all([gpuProcs, apps]).then(async ([g, a]) => {
     const procs = g.procs ?? [];
-    const state = await safeCollect(() => getEngineState(procs));
-    return { engine: buildEngine(state, { configured: !!cfg.llamacppAppName, switching: isSwitching() }), procs };
+    const state = a.error ? a : await safeCollect(() => getEngineState(procs, a));
+    return { engine: buildEngine(state, engineOpts()), procs };
   });
   return { gpuProcs, engine };
 }
 
-/** The active engine's loaded models (Ollama `/api/ps` or llama-server), null when none. */
+/**
+ * The active engine's loaded models (Ollama `/api/ps` or llama-server), null
+ * when none. Without llama.cpp (not configured, or its app not found) Ollama
+ * is always asked, whatever the app list says — as v1.5.1.
+ */
 function collectModels(engine, procs) {
-  if (engine.active === 'ollama') return safeCollect(getOllamaStatus);
+  if (!engine.enabled || engine.active === 'ollama') return safeCollect(getOllamaStatus);
   if (engine.active === 'llamacpp') return safeCollect(() => getLlamacppStatus(appVramBytes(procs, cfg.llamacppAppName)));
   return Promise.resolve(null);
 }
@@ -70,7 +81,7 @@ router.get('/status', async (_req, res) => {
     safeCollect(getHostStatus),
     safeCollect(getIpmiStatus),
   ]);
-  let engine = buildEngine(null, { configured: !!cfg.llamacppAppName, switching: isSwitching() });
+  let engine = buildEngine(null, engineOpts());
   let models = null, engineApp = null, gpu = null, gpuProcs = null, memory = null, network = null, uptime = null;
 
   if (host.alive) {
@@ -104,8 +115,10 @@ router.get('/engine-app', async (_req, res) => {
 });
 
 // Model management is an Ollama feature; with llama.cpp active these refuse
-// before touching anything.
+// before touching anything. Without llama.cpp configured the engine state is
+// not read at all, so these never depend on midclt.
 async function refuseWithLlamacpp(res) {
+  if (!cfg.llamacppAppName) return false;
   const { engine } = await readEngine().engine;
   if (engine.active !== 'llamacpp') return false;
   res.status(409).json({ error: 'Not available with llama.cpp' });
@@ -149,14 +162,14 @@ router.post('/sleep', async (_req, res) => {
   }
 });
 
+// The action takes the shared engine lock and picks the app from a fresh
+// app.query; the process list only breaks a conflict tie.
 router.post('/restart-engine', async (_req, res) => {
   try {
-    const { engine } = await readEngine().engine;
-    const name = appNameOf(engine);
-    if (!name) return res.status(409).json({ error: 'No engine is active' });
-    res.json(await restartEngine(name));
+    const procs = cfg.llamacppAppName ? ((await safeCollect(getGpuProcs)).procs ?? []) : [];
+    res.json(await restartEngine(procs));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -164,7 +177,6 @@ router.post('/switch-engine', async (req, res) => {
   const target = req.body?.target;
   if (!cfg.llamacppAppName) return res.status(404).json({ error: 'llama.cpp is not configured' });
   if (target !== 'ollama' && target !== 'llamacpp') return res.status(400).json({ error: `Unknown target: ${target ?? ''}` });
-  if (isSwitching()) return res.status(409).json({ error: 'Switch already in progress' });
   try {
     const host = await safeCollect(getHostStatus);
     if (!host.alive) return res.status(503).json({ error: 'Host is down' });
@@ -176,16 +188,13 @@ router.post('/switch-engine', async (req, res) => {
 
 // Gated in the UI on the active engine's update flag, but upgrades every app
 // that has one except the inactive engine — the engine update is the occasion,
-// not the scope.
+// not the scope. The action reads the app states itself, under the shared
+// engine lock, and fails closed (503) when it cannot.
 router.post('/upgrade-apps', async (_req, res) => {
   try {
-    const { engine } = await readEngine().engine;
-    const configured = !!cfg.llamacppAppName;
-    // Fail closed: without a known active engine we cannot tell which app is safe to touch.
-    if (configured && engine.error) return res.status(503).json({ error: `Cannot determine the active engine: ${engine.error}` });
-    res.json(await upgradeApps(skipListFor(engine, engineNames(), configured)));
+    res.json(await upgradeApps());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

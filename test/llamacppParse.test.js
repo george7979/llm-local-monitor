@@ -24,7 +24,7 @@ test('parseMetrics', () => {
   assert.deepEqual(parseMetrics(''), {});
 });
 test('formatParams', () => {
-  assert.equal(formatParams(26895998464), '26.9B');
+  assert.equal(formatParams(27_000_000_000), '27.0B');
   assert.equal(formatParams(7_600_000_000), '7.6B');
   assert.equal(formatParams(350_000_000), '350M');
   assert.equal(formatParams(0), '');
@@ -67,46 +67,52 @@ test('liveSpeed', () => {
   assert.equal(liveSpeed(p, { ts: 7000, idTask: 7, nDecoded: 100, processing: true }), null); // nothing decoded
   assert.equal(liveSpeed(p, { ts: 500, idTask: 7, nDecoded: 232, processing: true }), null);  // clock went back
   assert.equal(liveSpeed(null, p), null);
+  // overlapping reads milliseconds apart must not yield a spike (4 tokens / 10 ms = 400 tok/s)
+  assert.equal(liveSpeed(p, { ts: 1010, idTask: 7, nDecoded: 104, processing: true }), null);
+  assert.equal(liveSpeed(p, { ts: 1999, idTask: 7, nDecoded: 120, processing: true }), null);
+  assert.equal(liveSpeed(p, { ts: 2000, idTask: 7, nDecoded: 120, processing: true }), 20); // 1 s is enough
 });
-const SLOT = { id: 0, n_ctx: 200000, is_processing: true, id_task: 7, n_prompt_tokens: 80000, n_prompt_tokens_cache: 75000,
+const SLOT = { id: 0, n_ctx: 131072, is_processing: true, id_task: 7, n_prompt_tokens: 80000, n_prompt_tokens_cache: 75000,
                next_token: [{ n_decoded: 500, n_remain: 100, has_next_token: true }] };
 test('slot helpers', () => {
   assert.deepEqual(slotSample(SLOT, 5), { ts: 5, idTask: 7, nDecoded: 500, processing: true });
-  assert.deepEqual(contextFill(SLOT), { used: 80500, total: 200000, cached: 75000 });
+  assert.deepEqual(contextFill(SLOT), { used: 80500, total: 131072, cached: 75000 });
   assert.equal(activity(SLOT), 'generating');
   assert.equal(activity({ ...SLOT, next_token: [{ n_decoded: 0 }] }), 'reading');
   assert.equal(activity({ ...SLOT, is_processing: false }), 'idle');
   assert.deepEqual(contextFill({ id: 0, n_ctx: 8192, is_processing: false }), { used: 0, total: 8192, cached: 0 });
 });
 test('mapModelRow', () => {
-  const props  = { model_alias: 'model-a', model_ftype: 'Q8_0', default_generation_settings: { n_ctx: 200000 } };
-  const models = { data: [{ id: 'model-a', meta: { n_params: 26895998464, n_ctx: 200000, ftype: 'Q8_0' } }] };
+  const props  = { model_alias: 'model-a', model_ftype: 'Q8_0', default_generation_settings: { n_ctx: 131072 } };
+  const models = { data: [{ id: 'model-a', meta: { n_params: 27_000_000_000, n_ctx: 131072, ftype: 'Q8_0' } }] };
   assert.deepEqual(mapModelRow(props, models, 4096),
-    { name: 'model-a', parameterSize: '26.9B', quantization: 'Q8_0', contextLength: 200000, sizeVram: 4096 });
+    { name: 'model-a', parameterSize: '27.0B', quantization: 'Q8_0', contextLength: 131072, sizeVram: 4096 });
   assert.deepEqual(mapModelRow({}, {}, 0),
     { name: '', parameterSize: '', quantization: '', contextLength: 0, sizeVram: 0 });
 });
 test('launchParams', () => {
-  const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '200000', '-np', '1', '-t', '12', '-ub', '2048', '-b', '4096',
-               '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '4',
-               '--reasoning-budget', '4096', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
+  const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '131072', '-np', '1', '-t', '8', '-ub', '512', '-b', '2048',
+               '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '3',
+               '--reasoning-budget', '2048', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
   assert.deepEqual(launchParams(cmd), [
-    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×4' }, { label: 'slots', value: '1' },
-    { label: 'threads', value: '12' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '4096 / 2048' },
-    { label: 'reasoning', value: '4096' },
+    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
+    { label: 'threads', value: '8' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '2048 / 512' },
+    { label: 'reasoning', value: '2048' },
   ]);
   assert.deepEqual(launchParams(['-c', '8192']), []);
   assert.deepEqual(launchParams(undefined), []);
   assert.deepEqual(launchParams(['-ctk', 'q8_0', '-ctv', 'q4_0']), [{ label: 'KV', value: 'q8_0 / q4_0' }]);
   assert.deepEqual(launchParams(['-b', '4096']), [{ label: 'batch', value: '4096' }]);
 });
-test('launchParams: long aliases, MTP without length, non-MTP spec', () => {
+test('launchParams: long aliases, MTP without length, other spec types, none', () => {
   assert.deepEqual(launchParams(['--split-mode', 'row', '--parallel', '2', '--threads', '8',
     '--batch-size', '512', '--ubatch-size', '256', '--cache-type-k', 'f16', '--cache-type-v', 'f16', '--spec-type', 'mtp']), [
     { label: 'split', value: 'row' }, { label: 'MTP', value: 'on' }, { label: 'slots', value: '2' },
     { label: 'threads', value: '8' }, { label: 'KV', value: 'f16' }, { label: 'batch', value: '512 / 256' },
   ]);
-  assert.deepEqual(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '4']), []);
+  assert.deepEqual(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '3']), [{ label: 'spec', value: 'ngram ×3' }]);
+  assert.deepEqual(launchParams(['--spec-type', 'ngram']), [{ label: 'spec', value: 'ngram' }]);
+  assert.deepEqual(launchParams(['--spec-type', 'none', '--spec-draft-n-max', '3']), []);
   assert.deepEqual(launchParams(['-t']), []); // flag without value
 });
 

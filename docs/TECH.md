@@ -22,8 +22,9 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
   ├── POST /api/wake           → ipmitool → $IPMI_HOST
   ├── POST /api/sleep          → ipmitool power soft → $IPMI_HOST
   ├── POST /api/switch-engine  → SSH → midclt app.stop other (awaited), 3 s, app.start target; body {"target":"ollama"|"llamacpp"}
-  ├── POST /api/restart-engine → SSH → midclt call app.stop/start on the active engine's app (409 when none)
+  ├── POST /api/restart-engine → SSH → midclt app.query, app.stop (awaited), 3 s, app.start on the active engine's app (409 when none)
   ├── POST /api/upgrade-apps   → SSH → midclt call app.query, then app.upgrade_bulk / app.pull_images; skips non-active engine apps
+  │                              (switch, restart and upgrade share one lock: 409 while another runs)
   ├── POST /api/load-model     → Ollama REST /api/generate, keep_alive:-1; 409 with llama.cpp active
   ├── POST /api/unload-model   → Ollama REST /api/generate, keep_alive:0; 409 with llama.cpp active
   └── (llama.cpp) GET :8080 /props /v1/models /slots /metrics   ← polled by the llamacpp collector
@@ -47,11 +48,13 @@ Container llm-local-monitor (Dockge, <DOCKGE_HOST>)
 | Uptime | SSH → `/proc/uptime` (awk) | Instant kernel read, no middleware dependency; cache TTL = `pollIntervalSec - 1s` |
 | Update check | GitHub API `/releases/latest`, cached 1h server-side | 60 req/h limit without token — server cache prevents exhaustion; client checks on page load + every 6h |
 | Update-all UI triggers | Badge (engine app card) + button (SERVER card) | Button mirrors the badge; `disabled` driven by the active engine's update flag (`engine.updatesWaiting`; `engineApp.upgradeAvailable` when llama.cpp is not configured), same greying pattern as Wake; `upgradeAllApps(msgId)` routes feedback to the calling card |
-| App list read in the action | `upgradeApps()` calls `app.query` itself | The answer must be fresh at click time, not up to a poll interval old. Engine detection has its own polled `app.query` (`getApps()`, one per poll, cached 2 s, shared by every consumer) |
+| App list read in the action | `upgradeApps()` calls `app.query` itself, with `state` | The answer must be fresh at click time, not up to a poll interval old — the active engine and the skip list included. Engine detection for the poll has its own `app.query` (`getApps()`, one per poll, cached 2 s, shared by every consumer, read in parallel with the GPU process list) |
 | Active engine | From TrueNAS app state: an app not STOPPED is selected (RUNNING, DEPLOYING and CRASHED all count) | App state, not HTTP reachability: `llama-server` answers nothing useful while it downloads or loads a model, which can take an hour. Both selected = conflict: the engine whose app holds GPU processes wins, a tie goes to llama.cpp. Neither = none |
 | Engine matching on GPUs | By TrueNAS app name only (`gpuProcs` `container`), never by binary name | Ollama runs its own `llama-server` binary inside its container |
-| Update all apps vs engine apps | Every engine app that is not the active one is skipped (both when none is active) | Upgrading a stopped app may start it, putting both engines on the same GPUs. Unreadable engine state (llama.cpp configured) → HTTP 503, nothing is upgraded. The result names skipped apps that had an update pending. Not configured → nothing skipped, as v1.5.1 |
-| Switching engines | `switchEngine`: fresh `app.query`, stop other (`midclt call -j`, 120 s), 3 s, start target if STOPPED | Fresh read, not the 2 s cache. `switching` is an in-memory flag held only while the commands run; the target reaching RUNNING in the regular poll is the success signal. No rollback; a target that fails to start shows as the active engine in CRASHED |
+| Update all apps vs engine apps | Every engine app that is not the active one is skipped (both when none is active, and both on a conflict) | Upgrading a stopped app may start it, putting both engines on the same GPUs. Unreadable app list (llama.cpp configured) → HTTP 503, nothing is upgraded. The result names skipped apps that had an update pending. Not configured, or its app not found → nothing skipped, as v1.5.1 |
+| One engine-action lock | `src/lib/engineLock.js`, shared by switch, restart and Update all apps | Any of them can start or stop an engine app; overlapping (e.g. a restart during a switch's stop) could leave both engines on the same GPUs. Taken synchronously before the first await, released in `finally`; a refused request (409) never holds it. In-memory: a monitor restart clears it. `engine.switching` reports it, `engine.action` names the holder |
+| Switching engines | `switchEngine`: fresh `app.query`, stop other (`midclt call -j`, 120 s), 3 s, start target if STOPPED | Fresh read, not the 2 s cache. The target still STOPPING → 409 (it would finish stopping and leave no engine). The target reaching RUNNING in the regular poll is the success signal. No rollback; a target that fails to start shows as the active engine in CRASHED |
+| Restarting the engine | `restartEngine`: fresh `app.query`, stop (`midclt call -j`, 120 s), 3 s, start | The lock covers the real stop, not just a queued one. The app comes from the fresh read (the cache can still show an engine a switch has just stopped); a STOPPED app is just started. `app.restart` is not used: it skips the 3 s GPU gap |
 | Digest-pinned llama.cpp image | Never reports an update | With llama.cpp active the update button stays grey; other apps are updated from TrueNAS or while Ollama is active |
 | Two upgrade paths | `app.upgrade_bulk` for charts, `app.pull_images` for image-only | `upgrade_available` is a chart bump and pulls new images with it; `image_updates_available` alone is a fresher tag on the same chart, which `app.upgrade` does not handle. There is no bulk form of `pull_images` |
 | `snapshot_hostpaths` left off | Default `false`, as before | Only `ollama` uses `host_path` (463 GB of model blobs on `nvme_pcie`, 303 GB free); ZFS snapshots are free at creation but pin freed blocks afterwards, and nothing here prunes them. The apps with real config-migration risk sit on `ix_volume`, which the option does not cover. `app.rollback` remains the tool for a broken upgrade |
@@ -295,14 +298,14 @@ Every 6h     → /api/check-update → server (GitHub or 1h cache)
 
 ## llama.cpp engine
 
-Enabled by `LLAMACPP_APP_NAME`. `llama-server` must run with `--metrics`; `/slots` is on by default.
+Enabled by `LLAMACPP_APP_NAME` (an app of that name that does not exist behaves as not configured: Ollama-only, plus a "not found" warning). `llama-server` should run with `--metrics`; `/slots` is on by default. Without `/metrics` live speed still works (it comes from `/slots`); only the idle speed shows `—` and MTP is left out.
 No API key is used (authenticated llama-server is not supported).
 
 ### Payloads (field paths)
 
 - `GET /health` → `{"status":"ok"}` when ready (not used for engine detection)
 - `GET /props` → `model_alias`, `model_ftype` (quantization, e.g. `Q8_0`), `total_slots`, `default_generation_settings.n_ctx`
-- `GET /v1/models` → `data[0].id` (alias), `data[0].meta.n_params` (integer, shown as `26.9B`), `data[0].meta.n_ctx`, `data[0].meta.ftype`
+- `GET /v1/models` → `data[0].id` (alias), `data[0].meta.n_params` (integer, shown as `27.0B`), `data[0].meta.n_ctx`, `data[0].meta.ftype`
 - `GET /slots` → array of `{ id, n_ctx, is_processing, id_task, n_prompt_tokens, n_prompt_tokens_cache, next_token: [ { n_decoded, n_remain, has_next_token } ] }`
 - `GET /metrics` → Prometheus text, prefix `llamacpp:` — `tokens_predicted_total`, `tokens_predicted_seconds_total`, `prompt_tokens_total`, `prompt_seconds_total`, `requests_processing`, `spec_decode_num_draft_tokens_total`, `spec_decode_num_accepted_tokens_total`. Values may be in scientific notation (`3.91362e+06`)
 
@@ -310,25 +313,25 @@ No API key is used (authenticated llama-server is not supported).
 
 `/metrics` counters change only when a request finishes; `/slots` → `next_token.n_decoded` grows during generation. So:
 
-- **Live speed** (shown with ▶): change in `n_decoded` ÷ wall-clock time between two consecutive samples of the same `id_task`. While a slot is processing but nothing is decoded yet the card reads "reading prompt…"
+- **Live speed** (shown with ▶): change in `n_decoded` ÷ wall-clock time between two consecutive samples of the same `id_task`, at least 1 s apart (overlapping reads share one in-flight request). While a slot is processing but nothing is decoded yet the card reads "reading prompt…"
 - **Idle speed**: dimmed, from the change in `tokens_predicted_total` ÷ `tokens_predicted_seconds_total` at the moment the counters last moved; until a finished request has been seen, the ratio over the counters' lifetime
 - **MTP %**: `spec_decode_num_accepted_tokens_total` ÷ `spec_decode_num_draft_tokens_total`, same window as idle speed; hidden when the draft counter is absent or zero
 - Between-poll state lives in the collector (`llamacpp.js`); the transitions are the pure `advance()` in `llamacppParse.js`, reset whenever the server stops answering
 
 ### Cards
 
-- **Model row**: alias, parameters, quantization, context from `/props` + `/v1/models`; VRAM = sum of GPU memory held by the llama.cpp app's container (from the `gpuProcs` list). Server not ready → one dimmed "Loading model…" row. Columns Processor / Expires / actions are dropped and **Models…** hidden
-- **App card**: same container stats as Ollama (read from the active app), plus context fill per slot (idle slot keeps the last fill) and the launch parameters from `midclt call app.config <app>` (service `command`, cached 60 s). Only recognised flags are interpreted — split mode, speculative decoding type and draft length, slots, threads, KV cache quantization, batch sizes, reasoning budget; the full command is the block's tooltip
+- **Model row**: alias, parameters, quantization, context from `/props` + `/v1/models`; VRAM = sum of GPU memory held by the llama.cpp app's container (from the `gpuProcs` list). Server not ready → one dimmed "Loading model…" row while the app is RUNNING or DEPLOYING, otherwise "Not running (<STATE>)". Columns Processor / Expires / actions are dropped and **Models…** hidden
+- **App card**: same container stats as Ollama (read from the active app), plus context fill per slot (idle slot keeps the last fill) and the launch parameters from `midclt call app.config <app>` (service `command`, cached 60 s). Only recognised flags are interpreted — split mode, speculative decoding (`MTP ×n` for MTP types, `spec <type> ×n` for others, nothing for `none`), slots, threads, KV cache quantization, batch sizes, reasoning budget; the full command is the block's tooltip
 - **GPU badge**: `OLLAMA` / `LLAMA.CPP` per GPU, by the app that has a process on it; at 640 px and below the badge reads `LLAMA`
 - **No engine active**: the model card reads "No engine running", the app card lists both apps as stopped; either side of the switch starts that engine. **Conflict** shows "Both engines are running — pick one" in the SERVER card
 
 ### `/api/status` shape
 
-`ollama` → `models`, `ollamaApp` → `engineApp`, per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). `engine` is `{ active, switching, conflict, enabled, notFound, updatesWaiting, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`, plus `error` when the app list could not be read. With llama.cpp active `models` also carries `speed`, `mtp`, `activity`, `loading` and `slots`. Unconfigured: `engine.apps` has only `ollama`, the switch is not rendered and `switch-engine` returns 404. Renamed routes have no aliases.
+`ollama` → `models`, `ollamaApp` → `engineApp`, per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). `engine` is `{ active, switching, action, conflict, enabled, notFound, updatesWaiting, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }` (`switching` = an engine action holds the lock, `action` = `'switch' | 'restart' | 'upgrade' | null`), plus `error` when the app list could not be read. With llama.cpp active `models` also carries `speed`, `mtp`, `activity`, `loading` and `slots`. Unconfigured: `engine.apps` has only `ollama`, the switch is not rendered and `switch-engine` returns 404. Without llama.cpp (unconfigured or its app not found) `models` always comes from Ollama's `/api/ps` and the model routes never read the app list. Renamed routes have no aliases.
 
 ### Switch endpoint
 
-`POST /api/switch-engine` `{ "target": "ollama" | "llamacpp" }` — 404 when llama.cpp is not configured or an engine app is missing, 400 unknown target, 409 switch already running, 503 host down. Target already the only engine not STOPPED → `{ok:true, noop:true}`. A stop/start error → 500; the dashboard shows whatever the apps then report.
+`POST /api/switch-engine` `{ "target": "ollama" | "llamacpp" }` — 404 when llama.cpp is not configured or an engine app is missing, 400 unknown target, 409 another engine action running or the target app still STOPPING, 503 host down. `restart-engine` and `upgrade-apps` also answer 409 while another engine action runs; `upgrade-apps` answers 503 when the app list cannot be read (llama.cpp configured). Target already the only engine not STOPPED → `{ok:true, noop:true}`. A stop/start error → 500; the dashboard shows whatever the apps then report.
 
 ---
 
@@ -342,7 +345,8 @@ No API key is used (authenticated llama-server is not supported).
 | nvidia-smi: not found | No NVIDIA driver on host | Check: `ssh $LLM_USER@$LLM_HOST which nvidia-smi` |
 | ipmitool error | Wrong `IPMI_HOST`, user or password | Test: `ipmitool -I lanplus -H $IPMI_HOST -U $IPMI_USER -P $IPMI_PASS chassis status` |
 | Memory arc = 0 | `/proc/spl/kstat/zfs/arcstats` unavailable | Check: `ssh $LLM_USER@$LLM_HOST lsmod \| grep zfs` |
-| llama.cpp card shows `—` for speed / MTP | `llama-server` started without `--metrics` | Add `--metrics` to the app's command; `/slots` must also be enabled (it is by default) |
+| llama.cpp idle speed shows `—`, no MTP figure | `llama-server` started without `--metrics` (live speed still works, from `/slots`) | Add `--metrics` to the app's command |
+| llama.cpp shows no live speed while generating | `/slots` disabled | Leave `/slots` enabled (the default) |
 | llama.cpp model row stuck on "Loading model…" | `/props` or `/v1/models` not answering yet (model still loading) or `LLAMACPP_BASE_URL` wrong | Check: `curl http://$LLM_HOST:8080/health` — `{"status":"ok"}` when ready |
 | Engine app card: parse error | `midclt` not installed or no permissions | Test: `ssh $LLM_USER@$LLM_HOST midclt call core.ping` |
 | A model fails instantly with `option "stop" must be of type array` | Its stored parameters keep `stop` as a scalar; Ollama 0.32 requires an array | Rebuild the manifest — see _Repairing a model rejected by parameter validation_ |

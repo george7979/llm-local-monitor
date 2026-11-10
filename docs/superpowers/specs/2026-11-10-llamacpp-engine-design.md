@@ -51,9 +51,11 @@ This reverses the v1.5.0 decision "monitoring stays Ollama-only".
 | `LLAMACPP_APP_NAME` | unset | TrueNAS app name of the llama.cpp server. **Unset = feature off.** |
 | `LLAMACPP_BASE_URL` | `http://<LLM_HOST>:8080` | llama-server HTTP address |
 
-`llama-server` must be started with `--metrics`, and with the `/slots` endpoint
-enabled (it is by default). Without them the speed and MTP figures show `—`;
-everything else works.
+`llama-server` should be started with `--metrics`, and with the `/slots` endpoint
+enabled (it is by default). Live speed comes from `/slots`; without `--metrics`
+the idle speed shows `—` and the MTP figure is left out; everything else works.
+An `LLAMACPP_APP_NAME` whose app does not exist behaves as the feature off
+(Ollama-only), with a "not found" warning.
 
 ## Detecting the active engine
 
@@ -93,18 +95,24 @@ active engine's segment is highlighted.
 
 - Clicking the inactive segment asks for confirmation ("Switch to llama.cpp?
   Ollama will be stopped and its loaded models unloaded.") and then switches.
-- Both segments are disabled only while the server is executing the stop/start
-  commands (seconds, see Switching). After that the target is simply the active
+- Both segments are disabled while the server is executing an engine action
+  (switch, restart or Update all apps — see Switching) and while the engine
+  state cannot be read. After that the target is simply the active
   engine in whatever state TrueNAS reports — DEPLOYING shows as "Starting…" on
   its cards — and the switch is usable again, so the owner can back out of a
   long model load or a crash at any time.
 - **Restart Ollama** becomes **Restart <engine>** and acts on the active engine
-  in any state (RUNNING, DEPLOYING, CRASHED); disabled when none is active.
+  in any state (RUNNING, DEPLOYING, CRASHED); disabled when none is active. It
+  waits for the stop job, then 3 s, then starts the app.
+- Switch, restart and Update all apps share one server-side lock: while one
+  runs, the others answer HTTP 409 and their buttons (and the update badge) are
+  disabled.
 - **Update all apps** never touches an engine app that is not the active one
   (both are left alone when none is active): upgrading a stopped app may start
   it, which would put both engines on the same GPUs. An inactive engine is
-  updated after the owner switches to it. When the engine state cannot be read
-  the action refuses (HTTP 503) rather than upgrading everything. The button (and
+  updated after the owner switches to it. The active engine is read fresh at
+  click time (both engine apps are left alone on a conflict). When it cannot be
+  read the action refuses (HTTP 503) rather than upgrading everything. The button (and
   the app card's update badge) is enabled when the **active** engine's app has
   an update waiting — the v1.5.0 rule, applied to whichever engine is active:
   the engine needing an update is the occasion to sweep the other apps. Known
@@ -123,10 +131,10 @@ With llama.cpp active the card gains two engine-wide blocks below the container
 stats (Ollama exposes neither, so its card is unchanged):
 
 ```
-CONTEXT   ████████░░░░░░░░░░░░  82k / 200k   (cache 77k)
+CONTEXT   ████████░░░░░░░░░░░░  52k / 128k   (cache 48k)
 
-split tensor · MTP ×4 · slots 1 · threads 12
-KV q8_0 · batch 4096 / 2048 · reasoning 4096
+split tensor · MTP ×3 · slots 1 · threads 8
+KV q8_0 · batch 2048 / 512 · reasoning 2048
 ```
 
 - **Context fill** — live from `/slots`: `n_prompt_tokens` plus decoded tokens
@@ -138,7 +146,8 @@ KV q8_0 · batch 4096 / 2048 · reasoning 4096
   refreshed rarely (the values change only when the app restarts). Always
   visible, not collapsed. The GPUs assigned to the engine are deliberately not
   listed here — the engine badge on each GPU card already says that. Only
-  recognised flags are shown, in plain words: split mode (`-sm`), speculative decoding type and draft length, slots (`-np`),
+  recognised flags are shown, in plain words: split mode (`-sm`), speculative decoding type and draft length (`MTP ×n` for MTP types,
+  `spec <type> ×n` for any other, nothing for `none`), slots (`-np`),
   threads (`-t`), KV cache quantization (`-ctk`/`-ctv`), batch sizes
   (`-b`/`-ub`), reasoning budget. Unrecognised flags are not interpreted; the
   full command is available as the block's tooltip. A flag that is absent is
@@ -153,7 +162,7 @@ With llama.cpp active:
 ```
 LOADED MODELS                                    ▶ 21.7 tok/s · MTP 61%
 Model            Params   Quant   VRAM      Ctx
-<alias>          26.9B    Q8_0    38.2 GB   200k
+<alias>          27.0B    Q8_0    30.0 GB   128k
 ```
 
 - The header's right side — where **Models…** sits for Ollama — carries the
@@ -163,7 +172,8 @@ Model            Params   Quant   VRAM      Ctx
 - Row source: alias, parameter count, quantization and context from
   `/props` and `/v1/models`. VRAM is the sum of GPU memory held by the app's
   container, taken from the GPU process list the dashboard already collects.
-- App running but server not ready yet: a single dimmed row "Loading model…".
+- App RUNNING or DEPLOYING but server not ready yet: a single dimmed row
+  "Loading model…". Any other app state: "Not running (<STATE>)".
 
 ### GPU cards
 
@@ -207,14 +217,19 @@ already keeps its previous sample.
 `POST /api/switch-engine` with `{ "target": "ollama" | "llamacpp" }`.
 
 1. Reject if the host is down, the target is unknown, the feature is off, or
-   another switch is running (HTTP 409).
+   another engine action (switch, restart, Update all apps) is running
+   (HTTP 409). The target app still STOPPING is refused too (HTTP 409, "<App>
+   is still stopping — try again in a moment"): it would finish stopping after
+   the switch and leave no engine.
 2. Stop the other engine's app if it is not STOPPED; wait for the stop job.
 3. Wait 3 s (GPU release — the same gap the restart action uses).
 4. Start the target app.
 5. Respond once the start is queued. The UI treats the target app reaching
    RUNNING in the regular poll as the success signal, not the HTTP response.
 
-`engine.switching` is an in-memory server flag, true only between steps 2 and 5.
+`engine.switching` reports the in-memory engine-action lock (`engine.action`
+names its holder: switch, restart or upgrade); for a switch it is held from the
+fresh state read through step 5.
 It is not persisted and has no timeout of its own beyond the SSH command's; a
 monitor restart clears it, and the next poll shows the real app states.
 
@@ -233,7 +248,7 @@ No API key is used; authenticated llama-server is out of scope.
 - `GET /props` → `model_alias`, `model_ftype` (quantization, e.g. `Q8_0`),
   `total_slots`, `default_generation_settings.n_ctx`.
 - `GET /v1/models` → `data[0].id` (alias), `data[0].meta.n_params` (integer;
-  shown as `26.9B`), `data[0].meta.n_ctx`, `data[0].meta.ftype`.
+  shown as `27.0B`), `data[0].meta.n_ctx`, `data[0].meta.ftype`.
 - `GET /slots` → array of
   `{ id, n_ctx, is_processing, id_task, n_prompt_tokens, n_prompt_tokens_cache,
   next_token: [ { n_decoded, n_remain, has_next_token } ] }`.
@@ -250,7 +265,7 @@ Test fixtures use these shapes with made-up values (`model-a`, round numbers).
 Following the v1.5.0 precedent, renamed routes get no alias.
 
 - `/api/status`: `ollama` → `models`, `ollamaApp` → `engineApp`; new `engine`
-  object: `{ active, switching, conflict, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`;
+  object: `{ active, switching, action, conflict, apps: { ollama: {state, upgradeAvailable}, llamacpp: {…} } }`;
   per-GPU `hasOllama` → `engine` (`'ollama' | 'llamacpp' | null`). With llama.cpp
   active, `models` also carries `speed` and `mtp`.
 - `POST /api/restart-ollama` → `POST /api/restart-engine`.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipListFor, skippedWithUpdate, engineAppName, annotateGpus, switchPlan, restartTarget, upgradeSkipList } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -117,7 +117,7 @@ test('selectPending accepts a list of names to skip', () => {
   assert.deepEqual(selectPending(apps, []), { charts: ['ollama', 'app-a'], images: ['llama-cpp'], skipped: false });
 });
 
-test('engineAppName: unconfigured always the Ollama app, configured the active one', () => {
+test('engineAppName: not enabled always the Ollama app, enabled the active one', () => {
   assert.equal(engineAppName({ active: null }, N, false), 'ollama');
   assert.equal(engineAppName({ active: 'ollama' }, N, false), 'ollama');
   assert.equal(engineAppName({ active: null }, N, true), null);
@@ -134,13 +134,44 @@ test('annotateGpus copies and tags each GPU with its engine', () => {
 
 test('switchPlan: stop the other, start the target, or do nothing', () => {
   const ap = (o, l) => [{ name: 'ollama', state: o }, { name: 'llama-cpp', state: l }];
-  assert.deepEqual(switchPlan(ap('RUNNING', 'STOPPED'), 'llamacpp', N), { missing: false, stop: 'ollama', start: 'llama-cpp', noop: false });
-  assert.deepEqual(switchPlan(ap('STOPPED', 'STOPPED'), 'ollama', N), { missing: false, stop: null, start: 'ollama', noop: false });
+  assert.deepEqual(switchPlan(ap('RUNNING', 'STOPPED'), 'llamacpp', N), { missing: false, stopping: false, stop: 'ollama', start: 'llama-cpp', noop: false });
+  assert.deepEqual(switchPlan(ap('STOPPED', 'STOPPED'), 'ollama', N), { missing: false, stopping: false, stop: null, start: 'ollama', noop: false });
   assert.equal(switchPlan(ap('STOPPED', 'RUNNING'), 'llamacpp', N).noop, true);
   assert.equal(switchPlan(ap('STOPPED', 'CRASHED'), 'llamacpp', N).noop, true);
   // conflict: target already up, other must go
-  assert.deepEqual(switchPlan(ap('RUNNING', 'RUNNING'), 'ollama', N), { missing: false, stop: 'llama-cpp', start: null, noop: false });
+  assert.deepEqual(switchPlan(ap('RUNNING', 'RUNNING'), 'ollama', N), { missing: false, stopping: false, stop: 'llama-cpp', start: null, noop: false });
   assert.equal(switchPlan([{ name: 'ollama', state: 'RUNNING' }], 'llamacpp', N).missing, true);
   // the other engine's app absent is also missing: no start may run
   assert.equal(switchPlan([{ name: 'llama-cpp', state: 'STOPPED' }], 'llamacpp', N).missing, true);
+});
+
+test('switchPlan: a target still STOPPING is refused, never planned', () => {
+  const ap = (o, l) => [{ name: 'ollama', state: o }, { name: 'llama-cpp', state: l }];
+  assert.deepEqual(switchPlan(ap('RUNNING', 'STOPPING'), 'llamacpp', N), { missing: false, stopping: true, stop: null, start: null, noop: false });
+  assert.equal(switchPlan(ap('STOPPING', 'RUNNING'), 'ollama', N).stopping, true);
+  // the other engine STOPPING is just something to stop
+  assert.equal(switchPlan(ap('STOPPING', 'STOPPED'), 'llamacpp', N).stopping, false);
+});
+
+test('restartTarget: Ollama when llama.cpp is off or missing, else the active engine', () => {
+  const ap = (o, l) => [{ name: 'ollama', state: o }, ...(l ? [{ name: 'llama-cpp', state: l }] : [])];
+  assert.deepEqual(restartTarget(ap('STOPPED', 'RUNNING'), [], N, false), { name: 'ollama', state: 'STOPPED' });
+  assert.deepEqual(restartTarget(ap('STOPPED'), [], N, true), { name: 'ollama', state: 'STOPPED' });
+  assert.deepEqual(restartTarget([], [], N, false), { name: 'ollama', state: null });
+  assert.deepEqual(restartTarget(ap('STOPPED', 'RUNNING'), [], N, true), { name: 'llama-cpp', state: 'RUNNING' });
+  // STOPPING still counts as active
+  assert.deepEqual(restartTarget(ap('STOPPING', 'STOPPED'), [], N, true), { name: 'ollama', state: 'STOPPING' });
+  assert.deepEqual(restartTarget(ap('STOPPED', 'STOPPED'), [], N, true), { name: null, state: null });
+  // conflict: the GPU holder decides
+  assert.equal(restartTarget(ap('RUNNING', 'RUNNING'), [{ container: 'ollama' }], N, true).name, 'ollama');
+});
+
+test('upgradeSkipList: from fresh states, both engines on a conflict or none active', () => {
+  const ap = (o, l) => [{ name: 'ollama', state: o }, ...(l ? [{ name: 'llama-cpp', state: l }] : []), { name: 'app-a', state: 'RUNNING' }];
+  assert.deepEqual(upgradeSkipList(ap('RUNNING', 'STOPPED'), N, false), []);
+  assert.deepEqual(upgradeSkipList(ap('STOPPED'), N, true), []); // llama.cpp app missing = feature off
+  assert.deepEqual(upgradeSkipList(ap('STOPPING', 'STOPPED'), N, true), ['llama-cpp']);
+  assert.deepEqual(upgradeSkipList(ap('STOPPED', 'RUNNING'), N, true), ['ollama']);
+  assert.deepEqual(upgradeSkipList(ap('STOPPED', 'STOPPED'), N, true), ['ollama', 'llama-cpp']);
+  assert.deepEqual(upgradeSkipList(ap('RUNNING', 'RUNNING'), N, true), ['ollama', 'llama-cpp']);
 });

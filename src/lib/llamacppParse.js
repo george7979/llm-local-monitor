@@ -16,7 +16,7 @@ export function parseMetrics(text) {
   return out;
 }
 
-/** 26895998464 -> '26.9B', 350000000 -> '350M', falsy -> ''. */
+/** 27000000000 -> '27.0B', 350000000 -> '350M', falsy -> ''. */
 export function formatParams(n) {
   if (!num(n) || n <= 0) return '';
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
@@ -45,13 +45,17 @@ export function slotSample(slot, ts) {
   };
 }
 
-/** tok/s between two samples of the same task; null when not comparable. */
+// Shorter gaps than this between two samples give meaningless rates (a few
+// tokens over a few milliseconds); the poll interval is seconds.
+const MIN_SPEED_WINDOW_MS = 1_000;
+
+/** tok/s between two samples of the same task; null when not comparable or under 1 s apart. */
 export function liveSpeed(prev, cur) {
   if (!prev || !cur) return null;
   if (prev.idTask == null || prev.idTask !== cur.idTask) return null;
   const dt = cur.ts - prev.ts;
   const dn = cur.nDecoded - prev.nDecoded;
-  if (!(dt > 0) || !(dn > 0)) return null;
+  if (!(dt >= MIN_SPEED_WINDOW_MS) || !(dn > 0)) return null;
   return round1(dn / (dt / 1000));
 }
 
@@ -116,11 +120,12 @@ export function launchParams(command) {
   const pair = (a, b) => (a && b ? (a === b ? a : `${a} / ${b}`) : a || b);
 
   add('split', flagValue(command, ['-sm', '--split-mode']));
+  // Speculative decoding: MTP gets its own label, any other type shows as
+  // "spec <type> ×n"; "none" shows nothing.
   const spec = flagValue(command, ['--spec-type']);
-  if (spec && /mtp/i.test(spec)) {
-    const n = flagValue(command, ['--spec-draft-n-max']);
-    add('MTP', n ? `×${n}` : 'on');
-  }
+  const draftN = flagValue(command, ['--spec-draft-n-max']);
+  if (spec && /mtp/i.test(spec)) add('MTP', draftN ? `×${draftN}` : 'on');
+  else if (spec && spec.toLowerCase() !== 'none') add('spec', draftN ? `${spec} ×${draftN}` : spec);
   add('slots', flagValue(command, ['-np', '--parallel']));
   add('threads', flagValue(command, ['-t', '--threads']));
   add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])));

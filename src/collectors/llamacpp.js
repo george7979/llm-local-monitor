@@ -27,7 +27,16 @@ async function get(path, asText = false) {
 
 const NOT_READY = { models: [], loading: true, activity: null, speed: null, mtp: null, slots: [] };
 
+// Shared in-flight read: `cached()` does not share one, and two overlapping
+// misses would run advance() milliseconds apart.
+let inflight = null;
+
 export function getLlamacppStatus(vramBytes) {
+  inflight ??= read(vramBytes).finally(() => { inflight = null; });
+  return inflight;
+}
+
+function read(vramBytes) {
   return cached('llamacpp', 2_000, async () => {
     const [props, models, slots, metricsText] = await Promise.allSettled([
       get('/props'), get('/v1/models'), get('/slots'), get('/metrics', true),

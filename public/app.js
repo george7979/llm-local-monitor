@@ -29,6 +29,12 @@ let switchLine = false;       // the action line currently shows a switching mes
 const ollamaView = eng => !eng.enabled || eng.active === 'ollama';
 
 // The active engine's own update flag; without the feature, the Ollama app's.
+// An engine action (switch, restart, update all apps) holds the server lock,
+// or a switch we sent has not shown up yet: no other engine action may start.
+function engineBusy(eng) {
+  return !!eng?.switching || !!switchingTo;
+}
+
 function updatesWaiting(eng, app) {
   return eng.enabled ? !!eng.updatesWaiting : !!app?.upgradeAvailable;
 }
@@ -286,8 +292,8 @@ function renderStatus(host, ipmi, eng, engineApp) {
     ring.className  = 'status-ring alive';
     text.textContent  = 'Online';
     wake.disabled = true; sleep.disabled = false;
-    rst.disabled = !!eng.enabled && !eng.active;
-    upg.disabled = !updatesWaiting(eng, engineApp);
+    rst.disabled = (!!eng.enabled && !eng.active) || engineBusy(eng);
+    upg.disabled = !updatesWaiting(eng, engineApp) || engineBusy(eng);
   } else {
     ring.className  = 'status-ring dead';
     text.textContent  = 'Powered off';
@@ -315,7 +321,9 @@ function renderEngineSwitch(host, eng) {
     const on = eng.active === b.dataset.engine;
     b.classList.toggle('is-active', on);
     b.setAttribute('aria-pressed', String(on));
-    b.disabled = !alive || !!eng.switching || !!switchingTo;
+    // An unreadable engine state leaves `active` unknown: the confirm text
+    // would not match what the server's fresh plan does.
+    b.disabled = !alive || engineBusy(eng) || !!eng.error;
   }
 
   warn.textContent = '';
@@ -332,8 +340,9 @@ function renderEngineSwitch(host, eng) {
   if (switchingTo) {
     setMsg(line, `Switching to ${ENGINE_NAMES[switchingTo]}…`);
     switchLine = true;
-  } else if (eng.switching) {
-    setMsg(line, 'Switching engine…');
+  } else if (eng.switching && eng.action !== 'upgrade') {
+    // "Update all apps" reports on its own line; switch and restart use this one.
+    setMsg(line, eng.action === 'restart' ? 'Restarting engine…' : 'Switching engine…');
     switchLine = true;
   } else if (switchLine) {
     setMsg(line, '');
@@ -388,7 +397,7 @@ function renderModels(data, eng, host) {
   speed.hidden = true;
 
   if (llama && host?.alive) {
-    if (data && !data.error) { renderLlamacppModels(data, wrap, speed); return; }
+    if (data && !data.error) { renderLlamacppModels(data, wrap, speed, eng); return; }
     wrap.textContent = '';
     if (data?.error) wrap.appendChild(el('span', 'dim-text', 'Temporarily unavailable'));
     return;
@@ -411,10 +420,14 @@ function redrawOllama() {
   if (ollamaView(lastEngine)) renderOllama({ models: lastLoadedModels });
 }
 
-function renderLlamacppModels(data, wrap, speed) {
+function renderLlamacppModels(data, wrap, speed, eng) {
   wrap.textContent = '';
   if (data.loading) {
-    wrap.appendChild(el('span', 'dim-text', 'Loading model…'));
+    // "Loading model…" only while the app is up or coming up; a CRASHED or
+    // STOPPING app is not going to finish loading.
+    const state = eng.apps?.llamacpp?.state;
+    const starting = state === 'RUNNING' || state === 'DEPLOYING';
+    wrap.appendChild(el('span', 'dim-text', starting ? 'Loading model…' : `Not running (${state || '—'})`));
     return;
   }
 
@@ -786,9 +799,10 @@ function renderEngineApp(data, eng, host, slots) {
   const statusRow = el('div', 'app-status-row');
   const stateEl = stateBadge(data.state, eng);
   const hasUpdate = updatesWaiting(eng, data);
-  const updateBadge = el('span', `app-update-badge ${hasUpdate ? 'update clickable' : 'ok'}`,
+  const canUpdate = hasUpdate && !engineBusy(eng);
+  const updateBadge = el('span', `app-update-badge ${canUpdate ? 'update clickable' : hasUpdate ? 'update' : 'ok'}`,
     hasUpdate ? '⬆ Update' : '✓ Up to date');
-  if (hasUpdate) {
+  if (canUpdate) {
     updateBadge.title = 'Click to update every TrueNAS app that has an update waiting';
     updateBadge.onclick = () => upgradeAllApps();
   }
@@ -1123,6 +1137,8 @@ async function checkForUpdate() {
 // apps is resolved server-side at call time, so the names are only known once
 // the response comes back — hence the generic confirm and the specific result.
 async function upgradeAllApps(msgId = 'engine-upgrade-msg') {
+  // Buttons re-render only on a poll; the server lock answers 409 anyway.
+  if (engineBusy(lastEngine)) return;
   if (!confirm('Update every TrueNAS app that has an update waiting?\n' +
                'Each one restarts as it upgrades — ' + (lastEngine.enabled ? 'the active engine' : 'Ollama') + ' will be unavailable for a few minutes.')) return;
   const msg = document.getElementById(msgId);
@@ -1197,6 +1213,7 @@ async function doModelAction(kind, name) {
 }
 
 async function action(name) {
+  if (name === 'restart-engine' && engineBusy(lastEngine)) return;
   const confirmMsg = {
     sleep: 'Shut down the server?',
     'restart-engine': `Restart ${ENGINE_NAMES[lastEngine.active] || 'Ollama'}? Loaded models will be unloaded.`,
@@ -1213,5 +1230,7 @@ async function action(name) {
   } catch (e) {
     setMsg(msg, 'Error: ' + e.message, true);
   }
+  // The next poll must not wipe this result as a stale "Restarting engine…".
+  if (name === 'restart-engine') switchLine = false;
   setTimeout(() => { setMsg(msg, ''); }, 8000);
 }
