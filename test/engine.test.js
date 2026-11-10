@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEngine, gpuEngine, selectPending } from '../src/lib/engine.js';
+import { pickEngine, gpuEngine, selectPending, appVramBytes, buildEngine, skipNameFor, annotateGpus, switchPlan } from '../src/lib/engine.js';
 
 const N = { ollama: 'ollama', llamacpp: 'llama-cpp' };
 const S = s => ({ state: s });
@@ -50,4 +50,67 @@ test('selectPending skips the inactive engine', () => {
   ];
   assert.deepEqual(selectPending(apps, 'ollama'), { charts: [], images: ['app-a'], skipped: true });
   assert.deepEqual(selectPending(apps, 'app-b'),  { charts: ['ollama'], images: ['app-a'], skipped: false });
+});
+
+const procs = [
+  { busId: 'A', container: 'llama-cpp', vramMb: 1000 },
+  { busId: 'B', container: 'llama-cpp', vramMb: 500 },
+  { busId: 'B', container: 'ollama', vramMb: 7 },
+];
+
+test('appVramBytes sums the app\'s rows in bytes', () => {
+  assert.equal(appVramBytes(procs, 'llama-cpp'), 1500 * 1024 * 1024);
+  assert.equal(appVramBytes(procs, 'nope'), 0);
+  assert.equal(appVramBytes(procs, null), 0);
+  assert.equal(appVramBytes([{ container: null, vramMb: 5 }], null), 0);
+});
+
+const state = { active: 'llamacpp', conflict: false, notFound: null, updatesWaiting: false,
+  apps: { ollama: { state: 'STOPPED' }, llamacpp: { state: 'RUNNING' } } };
+
+test('buildEngine: enabled needs configured and found', () => {
+  assert.equal(buildEngine(state, { configured: true, switching: false }).enabled, true);
+  const missing = { ...state, apps: { ollama: { state: 'RUNNING' }, llamacpp: null } };
+  assert.equal(buildEngine(missing, { configured: true, switching: false }).enabled, false);
+  const off = buildEngine({ ...missing, active: 'ollama' }, { configured: false, switching: true });
+  assert.equal(off.enabled, false);
+  assert.equal(off.switching, true);
+  assert.deepEqual(Object.keys(off.apps), ['ollama']);
+});
+
+test('buildEngine: a failed or missing state degrades to switch-off', () => {
+  for (const bad of [null, { error: 'boom' }]) {
+    const e = buildEngine(bad, { configured: true, switching: false });
+    assert.equal(e.active, null);
+    assert.equal(e.enabled, false);
+    assert.deepEqual(e.apps, {});
+  }
+});
+
+test('skipNameFor is the inactive engine, null when unknown', () => {
+  const on = { enabled: true, active: 'llamacpp' };
+  assert.equal(skipNameFor(on, N), 'ollama');
+  assert.equal(skipNameFor({ enabled: true, active: 'ollama' }, N), 'llama-cpp');
+  assert.equal(skipNameFor({ enabled: true, active: null }, N), null);
+  assert.equal(skipNameFor({ enabled: false, active: 'ollama' }, N), null);
+  assert.equal(skipNameFor(null, N), null);
+});
+
+test('annotateGpus copies and tags each GPU with its engine', () => {
+  const gpu = { gpus: [{ busId: 'A' }, { busId: 'C' }] };
+  const out = annotateGpus(gpu, procs, N);
+  assert.deepEqual(out.gpus.map(g => g.engine), ['llamacpp', null]);
+  assert.equal('engine' in gpu.gpus[0], false);
+  assert.deepEqual(annotateGpus({ error: 'x' }, procs, N), { error: 'x' });
+});
+
+test('switchPlan: stop the other, start the target, or do nothing', () => {
+  const ap = (o, l) => [{ name: 'ollama', state: o }, { name: 'llama-cpp', state: l }];
+  assert.deepEqual(switchPlan(ap('RUNNING', 'STOPPED'), 'llamacpp', N), { missing: false, stop: 'ollama', start: 'llama-cpp', noop: false });
+  assert.deepEqual(switchPlan(ap('STOPPED', 'STOPPED'), 'ollama', N), { missing: false, stop: null, start: 'ollama', noop: false });
+  assert.equal(switchPlan(ap('STOPPED', 'RUNNING'), 'llamacpp', N).noop, true);
+  assert.equal(switchPlan(ap('STOPPED', 'CRASHED'), 'llamacpp', N).noop, true);
+  // conflict: target already up, other must go
+  assert.deepEqual(switchPlan(ap('RUNNING', 'RUNNING'), 'ollama', N), { missing: false, stop: 'llama-cpp', start: null, noop: false });
+  assert.equal(switchPlan([{ name: 'ollama', state: 'RUNNING' }], 'llamacpp', N).missing, true);
 });

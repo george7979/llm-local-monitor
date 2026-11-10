@@ -55,3 +55,58 @@ export function selectPending(apps, skipName = null) {
   }
   return { charts, images, skipped };
 }
+
+const MIB = 1024 * 1024;
+
+/** Bytes of VRAM held by one TrueNAS app, summed over every GPU process row it owns. */
+export function appVramBytes(procs, appName) {
+  if (!appName) return 0;
+  return procs.filter(p => p.container === appName).reduce((sum, p) => sum + (p.vramMb || 0) * MIB, 0);
+}
+
+/**
+ * The `engine` object of /api/status. `state` is getEngineState()'s result (or
+ * a collector `{ error }`); `configured` = LLAMACPP_APP_NAME is set. `enabled`
+ * means llama.cpp is configured AND its app exists. Unconfigured → `apps`
+ * carries only `ollama`. An unusable state degrades to "no engine, switch off"
+ * so the UI can disable the control instead of failing the whole poll.
+ */
+export function buildEngine(state, { configured, switching }) {
+  if (!state || state.error) {
+    return { active: null, conflict: false, notFound: null, apps: {}, updatesWaiting: false,
+      switching, enabled: false, ...(state?.error ? { error: state.error } : {}) };
+  }
+  const apps = configured ? state.apps : { ollama: state.apps.ollama };
+  return { ...state, apps, switching, enabled: configured && !!state.apps.llamacpp };
+}
+
+/** The inactive engine's app name, left out of "Update all apps"; null = skip nothing. */
+export function skipNameFor(engine, names) {
+  if (!engine?.enabled || !engine.active) return null;
+  return (engine.active === 'ollama' ? names.llamacpp : names.ollama) || null;
+}
+
+/** Copies of the GPU cards with the engine holding each GPU (never mutates the cached originals). */
+export function annotateGpus(gpu, procs, names) {
+  if (!gpu?.gpus) return gpu;
+  return { ...gpu, gpus: gpu.gpus.map(g => ({
+    ...g,
+    engine: gpuEngine(procs.filter(p => p.busId === g.busId), names),
+  })) };
+}
+
+/**
+ * What a switch has to do, from fresh app states (`[{ name, state }]`):
+ * stop the other engine unless STOPPED, start the target only if STOPPED.
+ * Nothing to do = no-op. `missing` = the target app does not exist.
+ */
+export function switchPlan(apps, target, names) {
+  const targetName = names[target];
+  const otherName = names[target === 'ollama' ? 'llamacpp' : 'ollama'];
+  const stateOf = name => apps.find(a => a.name === name)?.state;
+  if (!stateOf(targetName)) return { missing: true, stop: null, start: null, noop: false };
+  const otherState = stateOf(otherName);
+  const stop = otherState && otherState !== 'STOPPED' ? otherName : null;
+  const start = stateOf(targetName) === 'STOPPED' ? targetName : null;
+  return { missing: false, stop, start, noop: !stop && !start };
+}

@@ -13,16 +13,18 @@ function jobId(raw) {
  * Upgrades every app that has an update waiting.
  *
  * The app list is read here, at click time, rather than by a collector: the
- * dashboard deliberately monitors Ollama only, and this answer has to be fresh
- * at the moment of the call, not up to a poll interval stale.
+ * answer has to be fresh at the moment of the call, not up to a poll interval
+ * stale. `skipName` (the inactive engine's app) is never touched: upgrading a
+ * stopped app may start it, putting both engines on the same GPUs.
  */
-export async function upgradeApps() {
+export async function upgradeApps(skipName = null) {
   const raw = await sshExec(
     `midclt call app.query '[]' '{"select":["name","upgrade_available","image_updates_available"]}'`
   );
-  const { charts, images } = selectPending(JSON.parse(raw));
+  const { charts, images, skipped } = selectPending(JSON.parse(raw), skipName);
+  const skippedName = skipped ? skipName : null;
   const apps = [...charts, ...images];
-  if (!apps.length) return { ok: true, jobIds: [], apps: [] };
+  if (!apps.length) return { ok: true, jobIds: [], apps: [], skipped: skippedName };
 
   const jobIds = [];
 
@@ -38,5 +40,5 @@ export async function upgradeApps() {
     jobIds.push(jobId(await sshExec(`midclt call app.pull_images '"${name}"' '{"redeploy":true}'`)));
   }
 
-  return { ok: true, jobIds, apps };
+  return { ok: true, jobIds, apps, skipped: skippedName };
 }
