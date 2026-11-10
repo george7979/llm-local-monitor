@@ -440,15 +440,6 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex;
   flex-direction: column;
 }
-#engine-app-content .app-stat-grid {
-  flex: 1;
-  grid-auto-rows: 1fr;
-}
-#engine-app-content .app-stat {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
 
 /* ── MEMORY CARD vertical centering ───────── */
 
@@ -493,29 +484,16 @@ tbody tr:last-child td { border-bottom: none; }
 .app-update-badge.clickable { cursor: pointer; }
 .app-update-badge.clickable:hover { background: rgba(245,158,11,.2); border-color: rgba(245,158,11,.5); }
 
-.app-stat-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+.app-rows { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.app-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  font-family: var(--mono); font-size: 11px; line-height: 1.5;
 }
-
-.app-stat {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 7px 10px;
+.app-row-key {
+  font-family: var(--ui); font-size: 9px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim); flex-shrink: 0;
 }
-
-.app-stat-label {
-  font-size: 9px; font-weight: 600; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--dim); margin-bottom: 3px;
-}
-
-.app-stat-val {
-  font-family: var(--mono); font-size: 13px; font-weight: 500; color: #dde8f0;
-}
-
-.app-stat-sub {
-  font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 2px;
-}
-
-.app-bar-row { margin-top: 2px; }
+.app-row-val { color: var(--text); text-align: right; overflow-wrap: anywhere; }
 
 /* ── RESPONSIVE ────────────────────────────── */
 
@@ -625,7 +603,6 @@ button.modal-close:hover { color: var(--text); background: none; }
 /* hardcoded #dde8f0 (near-white) — invisible on white card */
 [data-theme="light"] .brand-name    { color: var(--text); }
 [data-theme="light"] .status-text   { color: var(--text); }
-[data-theme="light"] .app-stat-val  { color: var(--text); }
 [data-theme="light"] .mem-legend-gb { color: var(--text); }
 
 /* bar track: rgba(255,255,255,.05) invisible on white */
@@ -709,11 +686,5 @@ tr.row-resident td.td-model::after {
 .engine-app-name { font-size: 13px; color: var(--text); min-width: 70px; }
 .app-state-badge.starting {
   background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--amber);
-}
-.engine-block { margin-top: 10px; }
-.engine-block .gpu-row { margin-bottom: 0; }
-.engine-launch {
-  margin-top: 8px; font-family: var(--mono); font-size: 10px; line-height: 1.6;
-  color: var(--dim); overflow-wrap: anywhere; cursor: help;
 }
 @media (max-width: 640px) { .badge-suffix { display: none; } }

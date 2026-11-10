@@ -127,24 +127,31 @@ active engine's segment is highlighted.
 
 ### App card
 
-Title follows the engine: `OLLAMA APP` / `LLAMA.CPP APP`. Content is the same
-for both — state, version, image, CPU, RAM, I/O, network — read from the active
-app's container. The update badge works as today.
-
-With llama.cpp active the card gains two engine-wide blocks below the container
-stats (Ollama exposes neither, so its card is unchanged):
+Title follows the engine: `OLLAMA APP` / `LLAMA.CPP APP`. Under the state and
+update badges the card is one list of `KEY  value` lines, one under another. A
+line whose data is missing is left out. The update badge works as today.
 
 ```
-CONTEXT   ████████░░░░░░░░░░░░  52k / 128k   (cache 48k)
-
-split tensor · MTP ×3 · slots 1 · threads 8
-KV q8_0 · batch 2048 / 512 · reasoning 2048
+CPU                    4% · 24 cores
+RAM                          9.7 GB
+CONTEXT        52k / 128k · 41% · cache 48k
+SPLIT                        tensor
+MTP                              ×3
+SLOTS                             1
+THREADS                           8
+KV                             q8_0
+BATCH                    2048 / 512
+REASONING                      2048
 ```
+
+`CPU` and `RAM` come from the active app's container for either engine (`RAM`
+shows `used / limit` when the app has a memory limit). The lines from `CONTEXT`
+down appear only with llama.cpp:
 
 - **Context fill** — live from `/slots`: `n_prompt_tokens` plus decoded tokens
   against `n_ctx`, and how much of the prompt came from cache
-  (`n_prompt_tokens_cache`). With several slots, one bar per slot. Idle slot:
-  the bar keeps the last request's fill.
+  (`n_prompt_tokens_cache`). With several slots, one line per slot. Idle slot:
+  the line keeps the last request's fill.
 - **Launch parameters** — from the app's TrueNAS configuration
   (`midclt call app.config <app>`: the service `command` list). Read-only,
   refreshed rarely (the values change only when the app restarts). Always

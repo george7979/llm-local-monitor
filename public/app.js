@@ -763,28 +763,39 @@ function renderNoEngineApps(eng, wrap) {
   }
 }
 
-// CONTEXT bar(s) from the slots, one per slot; cache figure beside the label.
-function renderContext(slots, wrap) {
-  if (!slots?.length) return;
-  const box = el('div', 'engine-block');
-  slots.forEach((sl, i) => {
-    const pct = sl.total > 0 ? Math.round(sl.used / sl.total * 100) : 0;
-    const cls = pct > 90 ? 'fill-high' : pct > 70 ? 'fill-mid' : 'fill-low';
-    const label = slots.length > 1 ? `CONTEXT ${i + 1}` : 'CONTEXT';
-    const bar = makeGpuBar(label, `${fmtK(sl.used)} / ${fmtK(sl.total)}${sl.cached ? ` (cache ${fmtK(sl.cached)})` : ''}`, pct, cls);
-    bar.title = `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`;
-    box.appendChild(bar);
-  });
-  wrap.appendChild(box);
+// One "KEY  value" line of the engine app card.
+function appRow(key, value, title) {
+  const row = el('div', 'app-row');
+  row.appendChild(el('span', 'app-row-key', key));
+  row.appendChild(el('span', 'app-row-val', value));
+  if (title) row.title = title;
+  return row;
 }
 
-// Launch parameters, read-only; the full command is the tooltip.
-function renderLaunch(launch, wrap) {
-  if (!launch?.params?.length) return;
-  const box = el('div', 'engine-launch',
-    launch.params.map(p => `${p.label} ${p.value}`.trim()).join(' · '));
-  if (launch.command) box.title = launch.command;
-  wrap.appendChild(box);
+// The card's lines, top to bottom. A line whose data is missing is left out.
+function appRows(data, slots, llama) {
+  const rows = [];
+  if (data.cpu) {
+    rows.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
+      'Share of all host cores used by the app container'));
+  }
+  if (data.memory?.used) {
+    const { used, max } = data.memory;
+    rows.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used)));
+  }
+  if (!llama) return rows;
+  (slots || []).forEach((sl, i) => {
+    if (!sl.total) return;
+    const pct = Math.round(sl.used / sl.total * 100);
+    rows.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
+      `${fmtK(sl.used)} / ${fmtK(sl.total)} · ${pct}%${sl.cached ? ` · cache ${fmtK(sl.cached)}` : ''}`,
+      `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`));
+  });
+  // Launch parameters, read-only; the full command is the tooltip.
+  for (const p of data.launch?.params || []) {
+    rows.push(appRow(p.label, p.value, data.launch.command || ''));
+  }
+  return rows;
 }
 
 function renderEngineApp(data, eng, host, slots) {
@@ -821,41 +832,9 @@ function renderEngineApp(data, eng, host, slots) {
   if (imageEl) { imageEl.textContent = image.split('@')[0]; imageEl.title = image; }
   wrap.appendChild(statusRow);
 
-  // Stats grid
-  const grid = el('div', 'app-stat-grid');
-
-  // CPU
-  const cpuPct = data.cpu?.pct ?? 0;
-  const cpuCard = el('div', 'app-stat');
-  cpuCard.appendChild(el('div', 'app-stat-label', 'CPU'));
-  cpuCard.appendChild(el('div', 'app-stat-val', `${cpuPct}%`));
-  cpuCard.appendChild(el('div', 'app-stat-sub', data.cpu?.cores ? `${data.cpu.cores} cores` : ''));
-  const cpuBarRow = el('div', 'app-bar-row');
-  cpuBarRow.appendChild(makeGpuBar('', '', cpuPct,
-    cpuPct > 80 ? 'fill-high' : cpuPct > 40 ? 'fill-mid' : 'fill-low'));
-  cpuCard.appendChild(cpuBarRow);
-  grid.appendChild(cpuCard);
-
-  // RAM
-  const memCard = el('div', 'app-stat');
-  memCard.appendChild(el('div', 'app-stat-label', 'RAM'));
-  const memUsed = data.memory?.used ?? 0;
-  const memMax  = data.memory?.max  ?? 0;
-  memCard.appendChild(el('div', 'app-stat-val', fmt(memUsed)));
-  memCard.appendChild(el('div', 'app-stat-sub', memMax > 0 ? `limit ${fmt(memMax)}` : 'no limit'));
-  const memPct = memMax > 0 ? Math.round(memUsed / memMax * 100) : 0;
-  const memBarRow = el('div', 'app-bar-row');
-  memBarRow.appendChild(makeGpuBar('', '', memPct, 'fill-vram'));
-  memCard.appendChild(memBarRow);
-  grid.appendChild(memCard);
-
-
-  wrap.appendChild(grid);
-
-  if (eng.active === 'llamacpp') {
-    renderContext(slots, wrap);
-    renderLaunch(data.launch, wrap);
-  }
+  const list = el('div', 'app-rows');
+  appRows(data, slots, eng.active === 'llamacpp').forEach(r => list.appendChild(r));
+  wrap.appendChild(list);
 }
 
 // ── Memory ────────────────────────────────────────────────────────────
