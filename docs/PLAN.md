@@ -211,7 +211,10 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ⬜ Open |
 | 9 | Acceptance: during a generation live speed with ▶; after it dimmed last-request speed and MTP % | ⬜ Open |
 | 10 | Acceptance: with Ollama active and updates pending, Update all apps lights up and works as in v1.5.1; with llama.cpp active the button is grey; an update pending on the stopped engine is named as skipped and the app stays STOPPED | ⬜ Open |
-| 11 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
+| 11 | Acceptance: restart of the llama.cpp app from the dashboard (stop is awaited, up to ~2 min); launch-parameter line matches the flags the app really runs with | ⬜ Open |
+| 12 | Engine lock outlasts the request: keep it until TrueNAS reports the started app out of STOPPED, and while upgrade jobs queued by Update all apps are still running. Today a switch made right after a restart, or during a running upgrade, can leave both engines up | ⬜ Open — before release |
+| 13 | README and PRD FR2.3 say switch, restart and Update all apps "never overlap"; true for the requests, not for TrueNAS jobs still running — reword together with item 12 | ⬜ Open — before release |
+| 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
