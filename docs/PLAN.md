@@ -228,3 +228,4 @@ Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
 - [ ] Alerts: notify when GPU temp > 85°C or VRAM > 90%
 - [ ] `/metrics` endpoint for Prometheus (optional)
 - [ ] Multi-host support (multiple GPU servers)
+- [ ] TLS verification for engine HTTP: the Ollama and llama.cpp collectors accept any certificate (`rejectUnauthorized: false`). Verify by default; optional env var with a CA file for a private certificate. No effect on plain `http://` base URLs
