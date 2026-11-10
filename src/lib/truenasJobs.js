@@ -37,6 +37,18 @@ export function parseAppsAndJobs(raw) {
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 /**
+ * Runs withPendingJobs(appQuery) on `exec` and parses it. A failed command or
+ * an unreadable app list means the jobs are unknown too: 503 (fail closed).
+ */
+export async function readAppsAndJobs(exec, appQuery) {
+  try {
+    return parseAppsAndJobs(await exec(withPendingJobs(appQuery)));
+  } catch (err) {
+    throw fail(503, `Cannot read the engine state: ${err.message}`);
+  }
+}
+
+/**
  * Throws 409 while TrueNAS still has a job on an engine app, 503 when the job
  * list could not be read (fail closed: an unseen job may be starting one).
  */

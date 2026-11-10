@@ -346,8 +346,9 @@ function renderEngineSwitch(host, eng) {
     // "Update all apps" reports on its own line; switch and restart use this one.
     setMsg(line, eng.action === 'restart' ? 'Restarting engine…' : 'Switching engine…');
     switchLine = true;
-  } else if (eng.busy) {
-    // A TrueNAS job on an engine app (an upgrade, or one started in the TrueNAS UI).
+  } else if (eng.busy && (switchLine || !line.textContent)) {
+    // A TrueNAS job on an engine app (an upgrade, or one started in the TrueNAS
+    // UI) — never over another action's result, e.g. the apps Update all apps named.
     setMsg(line, `TrueNAS: ${eng.busy.method} on ${eng.busy.app}…`);
     switchLine = true;
   } else if (switchLine) {

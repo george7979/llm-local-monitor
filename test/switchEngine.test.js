@@ -191,7 +191,7 @@ test('switch issues a -j app.start with the long timeout, after the stop', () =>
   const res = await switchEngine('llamacpp', r.exec);
   assert.deepEqual(res, { ok: true, target: 'llamacpp', noop: false });
   assert.match(r.calls[0].cmd, /core\.get_jobs/);
-  assert.match(r.calls[1].cmd, /midclt call -j app\.stop 'ollama'/);
+  assert.ok(r.calls[1].cmd.startsWith(`midclt call -j app.stop '${cfg.ollamaAppName}'`), r.calls[1].cmd);
   assert.match(r.calls[2].cmd, /midclt call -j app\.start 'llama-test'/);
   assert.equal(r.calls[2].timeout, 120_000);
   assert.equal(engineAction(), null);
@@ -243,6 +243,17 @@ test('each action refuses 503 when the job list cannot be read, and releases the
   assert.equal((await upgradeApps(up.exec).catch(e => e)).status, 503);
   assert.equal(up.calls.length, 1);
   assert.equal(engineAction(), null);
+}));
+
+test('each action refuses 503 when the read itself throws (ssh down), one call, lock released', () => withLlamacpp(async () => {
+  for (const run of [ex => switchEngine('llamacpp', ex), ex => restartEngine([], ex, noWait), ex => upgradeApps(ex)]) {
+    const calls = [];
+    const err = await run(async cmd => { calls.push(cmd); throw new Error('ssh down'); }).catch(e => e);
+    assert.equal(err.status, 503);
+    assert.match(err.message, /ssh down/);
+    assert.equal(calls.length, 1);
+    assert.equal(engineAction(), null);
+  }
 }));
 
 test('feature off: restart checks the Ollama app only; upgrade reads no jobs', () => withoutLlamacpp(async () => {

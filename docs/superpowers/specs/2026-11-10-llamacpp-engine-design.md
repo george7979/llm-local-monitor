@@ -228,8 +228,8 @@ already keeps its previous sample.
    `app.update`, `app.upgrade`, `app.upgrade_bulk`, `app.pull_images`,
    `app.rollback`, `app.delete`, matched by exact app name in its arguments)
    refuses the switch (HTTP 409, "TrueNAS is still working on <app> (<method>)
-   — try again when it finishes"); a job list that cannot be read refuses it
-   with HTTP 503. The target app still STOPPING is refused too (HTTP 409,
+   — try again when it finishes"); a read that fails (ssh included) or a job
+   list that cannot be parsed refuses it with HTTP 503. The target app still STOPPING is refused too (HTTP 409,
    "<App> is still stopping — try again in a moment"): it would finish stopping
    after the switch and leave no engine.
 2. Stop the other engine's app if it is not STOPPED; wait for the stop job.
@@ -241,8 +241,9 @@ already keeps its previous sample.
 
 `engine.switching` reports the in-memory engine-action lock (`engine.action`
 names its holder: switch, restart or upgrade); for a switch it is held from the
-fresh state read through step 5. Restart and Update all apps (with llama.cpp
-configured) make the same TrueNAS-job check under the lock.
+fresh state read through step 5. Restart makes the same TrueNAS-job check
+under the lock (only the Ollama app with llama.cpp unset), and so does Update
+all apps with llama.cpp configured.
 
 `engine.busy` reports a TrueNAS job still running on an engine app as
 `{ app, method }` (null when none, or when the job list could not be read — the

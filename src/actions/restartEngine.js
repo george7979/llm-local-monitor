@@ -2,7 +2,7 @@ import { sshExec } from '../lib/ssh.js';
 import { cfg } from '../config.js';
 import { restartTarget } from '../lib/engine.js';
 import { acquireEngineLock } from '../lib/engineLock.js';
-import { withPendingJobs, parseAppsAndJobs, refuseWhileEngineJobs } from '../lib/truenasJobs.js';
+import { readAppsAndJobs, refuseWhileEngineJobs } from '../lib/truenasJobs.js';
 
 const JOB_TIMEOUT_MS = 120_000;  // a stop or start job can outlast sshExec's default 10 s
 const GPU_RELEASE_MS = 3_000;    // app.restart skips this GPU init gap, hence stop + start
@@ -20,7 +20,7 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
  * the 2 s cache, which can still show the engine a switch has just stopped;
  * the pending TrueNAS jobs come in the same round trip, and one still running
  * on an engine app (only the Ollama app with llama.cpp unset) refuses with
- * 409, an unreadable job list with 503. `procs` (GPU process rows) only break
+ * 409; an unreadable read (ssh failure included) with 503. `procs` (GPU process rows) only break
  * a conflict tie. A STOPPED app is just started.
  */
 export async function restartEngine(procs = [], exec = sshExec, wait = sleep) {
@@ -28,7 +28,7 @@ export async function restartEngine(procs = [], exec = sshExec, wait = sleep) {
   try {
     const names = { ollama: cfg.ollamaAppName, llamacpp: cfg.llamacppAppName };
     const filter = JSON.stringify([['name', 'in', [names.ollama, names.llamacpp].filter(Boolean)]]);
-    const read = parseAppsAndJobs(await exec(withPendingJobs(`midclt call app.query '${filter}' '{"select":["name","state"]}'`)));
+    const read = await readAppsAndJobs(exec, `midclt call app.query '${filter}' '{"select":["name","state"]}'`);
     refuseWhileEngineJobs(read, names);
     const { name, state } = restartTarget(read.apps, procs, names, !!names.llamacpp);
     if (!name) throw fail(409, 'No engine is active');
