@@ -24,7 +24,7 @@ docker compose up -d
 docker compose logs -f
 docker compose down
 
-# After code changes:
+# After code changes (local Docker only):
 docker compose build && docker compose up -d
 
 # API test (no auth — open endpoints)
@@ -48,6 +48,7 @@ Dashboard for monitoring a TrueNAS GPU server running Ollama or llama.cpp, one a
 - **Backend:** Express 5 ESM, data via SSH (nvidia-smi, cgroups, midclt), Ollama REST API and llama-server HTTP
 - **Frontend:** vanilla HTML/CSS/JS, polling every 5s, no auth
 - **Deploy:** Docker container on Dockge host, port 3788
+- **Deploying a change (dev or release):** in Dockge press **Update** on the stack — it rebuilds from GitHub (`no_cache: true` + `pull_policy: build`); **Restart** keeps the old code. The stack builds from the branch in its compose (`#dev` for acceptance tests, `#main` otherwise). Check with `curl http://<DOCKGE_HOST>:3788/api/config`. Details: README → "Updating after code changes"
 
 ---
 
