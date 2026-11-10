@@ -764,15 +764,16 @@ function renderNoEngineApps(eng, wrap) {
 }
 
 // One "KEY  value" line of the engine app card.
-function appRow(key, value, title) {
-  const row = el('div', 'app-row');
+function appRow(key, value, title, wide = false) {
+  const row = el('div', wide ? 'app-row wide' : 'app-row');
   row.appendChild(el('span', 'app-row-key', key));
   row.appendChild(el('span', 'app-row-val', value));
   if (title) row.title = title;
   return row;
 }
 
-// The card's lines, top to bottom. A line whose data is missing is left out.
+// The card's entries, laid out in two columns (context spans both). An entry
+// whose data is missing is left out.
 function appRows(data, slots, llama) {
   const rows = [];
   if (data.cpu) {
@@ -789,7 +790,7 @@ function appRows(data, slots, llama) {
     const pct = Math.round(sl.used / sl.total * 100);
     rows.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
       `${fmtK(sl.used)} / ${fmtK(sl.total)} · ${pct}%${sl.cached ? ` · cache ${fmtK(sl.cached)}` : ''}`,
-      `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`));
+      `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens`, true));
   });
   // Launch parameters, read-only; the full command is the tooltip.
   for (const p of data.launch?.params || []) {
