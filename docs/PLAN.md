@@ -192,17 +192,13 @@ Rejected during design, recorded so it is not re-litigated:
 
 ## Milestone: v1.6.0 — llama.cpp as an alternative engine
 
-**Status:** 🔄 Code on `dev`; owner acceptance on the live server open
+**Status:** 🔄 Released as v1.6.0; screenshots open
 
-**Current step.** The owner is testing the `#dev` build on the production
-dashboard (the Dockge stack builds `#dev`, see item 15) and will come back with
-remarks. Work resumes from those remarks; after them, the acceptance items
-below (7–13a), then the release (14–15). The engine app card was reshaped during
-this review: no Block I/O / Network, and `KEY  value` entries in two columns
-instead of CPU/RAM tiles. Nobody has yet run a real switch, restart or Update
-all apps from the dashboard — the first real one is part of the acceptance.
-Development rule: no switch or restart of the engine on the live server without
-the owner's go-ahead (`CLAUDE.md`).
+**Current step.** v1.6.0 is on `main` and released. Next: the owner points the
+Dockge stack back at `#main` and presses **Update** (item 15); once production
+shows v1.6.0, the owner supplies new screenshots and they replace the v1.5 images
+in the README (item 16). Development rule: no switch or restart of the engine on
+the live server without the owner's go-ahead (`CLAUDE.md`).
 
 The dashboard follows whichever engine is active — Ollama or a llama.cpp server
 (`llama-server`) run as a second TrueNAS app — and a switch in the SERVER card moves
@@ -217,16 +213,17 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 4 | Update all apps skips non-active engine apps, refuses (503) when the engine state is unreadable | ✅ Done |
 | 5 | UI: engine switch, engine-titled app card (two columns of entries: context, CPU, RAM, slots, threads / split, MTP, KV, batch, reasoning), llama.cpp model card, `LLAMA` badge on narrow screens | ✅ Done |
 | 6 | Documentation (PRD, TECH, README, CLAUDE.md) | ✅ Done |
-| 7 | Acceptance: switch llama.cpp → Ollama — llama.cpp app STOPPED, Ollama RUNNING, cards and badges follow, Load / Unload work | ⬜ Open |
-| 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ⬜ Open |
-| 9 | Acceptance: during a generation live speed with ▶; after it dimmed last-request speed and MTP % | ⬜ Open |
-| 10 | Acceptance: with Ollama active and updates pending, Update all apps lights up and works as in v1.5.1; with llama.cpp active the button is grey; an update pending on the stopped engine is named as skipped and the app stays STOPPED | ⬜ Open |
-| 11 | Acceptance: restart of the llama.cpp app from the dashboard (stop is awaited, up to ~2 min); launch-parameter line matches the flags the app really runs with | ⬜ Open |
+| 7 | Acceptance: switch llama.cpp → Ollama — llama.cpp app STOPPED, Ollama RUNNING, cards and badges follow, Load / Unload work | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 9 | Acceptance: during a generation live speed with ▶; after it dimmed last-request speed and MTP % | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 10 | Acceptance: with Ollama active and updates pending, Update all apps lights up and works as in v1.5.1; with llama.cpp active the button is grey; an update pending on the stopped engine is named as skipped and the app stays STOPPED | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 11 | Acceptance: restart of the llama.cpp app from the dashboard (stop is awaited, up to ~2 min); launch-parameter line matches the flags the app really runs with | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
 | 12 | Engine actions respect TrueNAS jobs: switch and restart await the start job; switch, restart and Update all apps refuse (409) while a TrueNAS job runs on an engine app, 503 when the job list is unreadable; `engine.busy` in status and UI | ✅ Done |
 | 13 | README and PRD FR2.3 describe the refusal rule (in-monitor lock plus TrueNAS jobs) instead of "never overlap" | ✅ Done |
-| 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ⬜ Open |
-| 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ⬜ Open |
+| 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ✅ Done |
 | 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ⬜ Open |
+| 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with v1.6.0 shots (the owner supplies them once production shows v1.6.0) | ⬜ Open |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
