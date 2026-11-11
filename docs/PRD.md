@@ -3,13 +3,13 @@
 **Version:** 1.5.0
 **Date:** 2026-08-17
 **Author:** Jerzy Maczewski
-**Purpose:** Web dashboard for monitoring a GPU server running Ollama
+**Purpose:** Web dashboard for monitoring a GPU server running Ollama or llama.cpp
 
 ---
 
 ## Executive Summary
 
-The dashboard replaces manual SSH-ing to the GPU server (`$LLM_HOST`) to check the state of loaded LLM models, GPU utilization, and RAM allocation. It also provides power control buttons (wake/shut down) and Ollama service restart — without opening a terminal.
+The dashboard replaces manual SSH-ing to the GPU server (`$LLM_HOST`) to check the state of loaded LLM models, GPU utilization, and RAM allocation. It also provides power control buttons (wake/shut down) and restart of the active LLM engine (Ollama or llama.cpp), plus a switch between the two — without opening a terminal.
 
 ---
 
@@ -44,23 +44,25 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 ### FR1: Real-time monitoring
 
 - **FR1.1** Display host status (online/offline)
-- **FR1.2** Display list of actively loaded LLM models with parameters (size, quantization, GPU/CPU usage, context, expiry time)
+- **FR1.1a** Detect the active engine (Ollama or llama.cpp) from the state of its TrueNAS app and show that engine's model, app stats and GPU badge. llama.cpp is optional: without `LLAMACPP_APP_NAME` the dashboard is Ollama-only
+- **FR1.2** Display list of actively loaded LLM models with parameters. Ollama: size, quantization, GPU/CPU usage, context, expiry time. llama.cpp: alias, parameter count, quantization, VRAM, context, plus generation speed (live while generating, last request when idle) and MTP draft acceptance rate
 - **FR1.3** Display GPU stats: utilization, VRAM, temperature, power draw
 - **FR1.4** Display RAM breakdown: free / ZFS ARC / services
-- **FR1.5** Display Ollama container stats: CPU%, RAM, Block I/O, Network, app status, version, update availability
+- **FR1.5** Display the active engine's container stats: CPU%, RAM, app status, version, update availability. With llama.cpp also context fill per slot and the server's launch parameters
 - **FR1.6** Auto-refresh every N seconds without user interaction (configurable via `POLL_INTERVAL_SEC`)
 - **FR1.7** Display IPMI/network reachability status in header — `Reachable / Unreachable` based on TCP probe, independent from OS state
 - **FR1.8** Display server uptime in SERVER card
 - **FR1.9** Display LAN port throughput as live histograms (optional widget, requires configuration)
-- **FR1.10** Show which workload occupies each GPU: clicking a GPU card opens a modal listing all compute processes on that card with a **meaningful name** (TrueNAS app / container name, e.g. `ollama`) instead of a raw binary path, plus PID and VRAM usage; the list live-refreshes while open
+- **FR1.10** Show which workload occupies each GPU: clicking a GPU card opens a modal listing all compute processes on that card with a **meaningful name** (TrueNAS app / container name, e.g. `ollama`, `llama-cpp`) instead of a raw binary path, plus PID and VRAM usage; the list live-refreshes while open
 
 ### FR2: Server control
 
 - **FR2.1** **Wake** button — remotely powers on the server via BMC
 - **FR2.2** **Shut down** button — gracefully shuts down the server
-- **FR2.3** **Restart Ollama** button — restarts the Ollama service without rebooting the server
+- **FR2.3** **Restart <engine>** button — restarts the active engine's app (Ollama or llama.cpp) in any state without rebooting the server: waits for the stop, 3 s for the GPUs, then starts it and waits for the start; disabled when no engine is active. Switch, restart and Update all apps refuse (HTTP 409) while another of them runs in the monitor; switch and restart — and Update all apps when llama.cpp is configured — also refuse while TrueNAS still has a job running on an engine app. Their controls are disabled meanwhile
+- **FR2.3a** **Engine switch** (`Ollama | llama.cpp`) in the SERVER card — stops the other engine's app and starts the chosen one, so at most one engine holds the GPUs. Shown only when llama.cpp is configured
 - **FR2.4** Buttons enabled/disabled based on host state
-- **FR2.5** **Update all apps** — triggers an upgrade of *every* TrueNAS app with an update waiting, via midclt; available both as the pulsing `⬆ Update` badge in OLLAMA APP card and as an **Update all apps** button in the SERVER card. Both remain gated on Ollama's own upgrade flag: Ollama needing an update is the occasion to sweep the rest, so the button is greyed out when Ollama is current (same pattern as the Wake button). The dashboard monitors Ollama only; the other apps are enumerated server-side at click time and named back in the result line
+- **FR2.5** **Update all apps** — triggers an upgrade of *every* TrueNAS app with an update waiting, via midclt, except the engine apps that are not the active one (upgrading a stopped app may start it and put both engines on the same GPUs; both are skipped when none is active; the active engine is read fresh at click time, and the action refuses when it cannot be read). Available both as the pulsing `⬆ Update` badge in the engine app card and as an **Update all apps** button in the SERVER card. Both are gated on the *active* engine's own upgrade flag: that engine needing an update is the occasion to sweep the rest, so the button is greyed out when it is current (same pattern as the Wake button). The other apps are enumerated server-side at click time and named back in the result line, together with any skipped engine app that had an update pending
 
 ### FR3: Navigation
 
@@ -92,7 +94,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 
 - **M1** No need to open an SSH terminal to check LLM server state
 - **M2** Time to "is the model loaded?" information < 5 s from opening the browser
-- **M3** Wake/Shut down/Restart Ollama works from the dashboard without additional steps
+- **M3** Wake/Shut down/Restart engine/Switch engine works from the dashboard without additional steps
 
 ---
 
@@ -110,5 +112,6 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 - Historical metrics / charts (v2)
 - Push notifications (email, Telegram)
 - Monitoring other hosts
+- Changing the llama.cpp model or start flags, and load / unload for llama.cpp (the model lives as long as its container); engines other than Ollama and llama.cpp
 - Public exposure
 - System log streaming

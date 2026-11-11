@@ -139,8 +139,10 @@ Same two triggers, same gating on Ollama's flag — only the action widens. Olla
 needing an update is the occasion to sweep every other TrueNAS app that has one,
 so pending updates elsewhere on the host stop going unnoticed. Whichever apps the
 host happens to run are picked up as they are — nothing is named or configured.
-Monitoring stays Ollama-only by decision: the app list is read inside the action
-at click time, not by a polled collector.
+At v1.5.0 monitoring was Ollama-only by decision, and the app list was read inside
+the action at click time rather than by a polled collector. From v1.6.0 the gating
+follows the active engine and the polled `app.query` is shared; the action still
+reads the list fresh at click time.
 
 | # | Task | Status |
 |---|------|--------|
@@ -188,6 +190,46 @@ Rejected during design, recorded so it is not re-litigated:
 
 ---
 
+## Milestone: v1.6.0 — llama.cpp as an alternative engine
+
+**Status:** 🔄 Released as v1.6.0; screenshots open
+
+**Current step.** v1.6.0 is on `main` and released. Next: the owner points the
+Dockge stack back at `#main` and presses **Update** (item 15); once production
+shows v1.6.0, the owner supplies new screenshots and they replace the v1.5 images
+in the README (item 16). Development rule: no switch or restart of the engine on
+the live server without the owner's go-ahead (`CLAUDE.md`).
+
+The dashboard follows whichever engine is active — Ollama or a llama.cpp server
+(`llama-server`) run as a second TrueNAS app — and a switch in the SERVER card moves
+the GPUs between them. Optional: without `LLAMACPP_APP_NAME` the dashboard behaves as
+v1.5.1. Update all apps skips every engine app that is not the active one.
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Engine selection from app state (`pickEngine`, conflict tie-break by GPU holder), per-GPU engine badge | ✅ Done |
+| 2 | llama-server collector: `/props`, `/v1/models`, `/slots`, `/metrics`; live and last-request speed, MTP %, context fill | ✅ Done |
+| 3 | `POST /api/switch-engine`, `POST /api/restart-engine`; engine-aware `/api/status`; renamed routes, no aliases | ✅ Done |
+| 4 | Update all apps skips non-active engine apps, refuses (503) when the engine state is unreadable | ✅ Done |
+| 5 | UI: engine switch, engine-titled app card (two columns of entries: context, CPU, RAM, slots, threads / split, MTP, KV, batch, reasoning), llama.cpp model card, `LLAMA` badge on narrow screens | ✅ Done |
+| 6 | Documentation (PRD, TECH, README, CLAUDE.md) | ✅ Done |
+| 7 | Acceptance: switch llama.cpp → Ollama — llama.cpp app STOPPED, Ollama RUNNING, cards and badges follow, Load / Unload work | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 8 | Acceptance: switch back — model row returns after load; switch stays usable while the app is DEPLOYING | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 9 | Acceptance: during a generation live speed with ▶; after it dimmed last-request speed and MTP % | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 10 | Acceptance: with Ollama active and updates pending, Update all apps lights up and works as in v1.5.1; with llama.cpp active the button is grey; an update pending on the stopped engine is named as skipped and the app stays STOPPED | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 11 | Acceptance: restart of the llama.cpp app from the dashboard (stop is awaited, up to ~2 min); launch-parameter line matches the flags the app really runs with | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 12 | Engine actions respect TrueNAS jobs: switch and restart await the start job; switch, restart and Update all apps refuse (409) while a TrueNAS job runs on an engine app, 503 when the job list is unreadable; `engine.busy` in status and UI | ✅ Done |
+| 13 | README and PRD FR2.3 describe the refusal rule (in-monitor lock plus TrueNAS jobs) instead of "never overlap" | ✅ Done |
+| 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
+| 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ✅ Done |
+| 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ⬜ Open |
+| 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with v1.6.0 shots (the owner supplies them once production shows v1.6.0) | ⬜ Open |
+
+Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
+Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
+
+---
+
 ## v2 Backlog (after v1 stabilization)
 
 - [ ] SQLite: per-minute GPU/memory samples, 7-day retention
@@ -195,3 +237,4 @@ Rejected during design, recorded so it is not re-litigated:
 - [ ] Alerts: notify when GPU temp > 85°C or VRAM > 90%
 - [ ] `/metrics` endpoint for Prometheus (optional)
 - [ ] Multi-host support (multiple GPU servers)
+- [ ] TLS verification for engine HTTP: the Ollama and llama.cpp collectors accept any certificate (`rejectUnauthorized: false`). Verify by default; optional env var with a CA file for a private certificate. No effect on plain `http://` base URLs
