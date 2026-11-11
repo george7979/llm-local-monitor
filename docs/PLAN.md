@@ -194,10 +194,9 @@ Rejected during design, recorded so it is not re-litigated:
 
 **Status:** 🔄 Released as v1.6.0; screenshots open
 
-**Current step.** v1.6.0 is on `main` and released. Next: the owner points the
-Dockge stack back at `#main` and presses **Update** (item 15); once production
-shows v1.6.0, the owner supplies new screenshots and they replace the v1.5 images
-in the README (item 16). Development rule: no switch or restart of the engine on
+**Current step.** v1.6.0 is released and runs in production (Dockge stack on
+`#main`). Open: the owner supplies new screenshots and they replace the v1.5
+images in the README (item 16). Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
 
 The dashboard follows whichever engine is active — Ollama or a llama.cpp server
@@ -222,7 +221,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 13 | README and PRD FR2.3 describe the refusal rule (in-monitor lock plus TrueNAS jobs) instead of "never overlap" | ✅ Done |
 | 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
 | 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ✅ Done |
-| 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ⬜ Open |
+| 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ✅ Done — compose on `#main`, `/api/config` reports `1.6.0`, no collector errors |
 | 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with v1.6.0 shots (the owner supplies them once production shows v1.6.0) | ⬜ Open |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
