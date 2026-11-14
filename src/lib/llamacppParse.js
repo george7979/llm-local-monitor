@@ -72,6 +72,12 @@ function mtpOf(accepted, draft) {
   return num(accepted) != null && num(draft) != null && draft > 0 && accepted >= 0
     ? Math.round((accepted / draft) * 100) : null;
 }
+/** Share of prompt tokens taken from the cache; `processed` excludes cached ones. */
+export function cacheOf(cached, processed) {
+  return num(cached) != null && num(processed) != null && cached >= 0 && processed >= 0
+    && cached + processed > 0
+    ? Math.round((cached / (cached + processed)) * 100) : null;
+}
 
 /** Speed and MTP over the span between two /metrics samples; null unless tokens_predicted_total grew. */
 export function requestWindow(prevM, curM) {
@@ -82,6 +88,7 @@ export function requestWindow(prevM, curM) {
   return {
     speed: speedOf(dTokens, d('tokens_predicted_seconds_total')),
     mtp: mtpOf(d('spec_decode_num_accepted_tokens_total'), d('spec_decode_num_draft_tokens_total')),
+    cache: cacheOf(d('prompt_tokens_cached_total'), d('prompt_tokens_total')),
   };
 }
 
@@ -89,14 +96,29 @@ export function lifetimeStats(m) {
   return {
     speed: speedOf(m?.tokens_predicted_total, m?.tokens_predicted_seconds_total),
     mtp: mtpOf(m?.spec_decode_num_accepted_tokens_total, m?.spec_decode_num_draft_tokens_total),
+    cache: cacheOf(m?.prompt_tokens_cached_total, m?.prompt_tokens_total),
   };
+}
+
+/**
+ * Cache share of the prompts now being processed (summed over busy slots),
+ * from /slots; null when no slot is busy or none has its prompt counted yet.
+ */
+export function liveCache(slots) {
+  let cached = 0, total = 0;
+  for (const s of Array.isArray(slots) ? slots : []) {
+    if (!s?.is_processing) continue;
+    const t = num(s.n_prompt_tokens), c = num(s.n_prompt_tokens_cache);
+    if (t == null || c == null || t <= 0 || c > t) continue;
+    cached += c; total += t;
+  }
+  return total > 0 ? { pct: Math.round((cached / total) * 100), cached, total } : null;
 }
 
 export function contextFill(slot) {
   return {
     used: (num(slot?.n_prompt_tokens) ?? 0) + decoded(slot),
     total: num(slot?.n_ctx) ?? 0,
-    cached: num(slot?.n_prompt_tokens_cache) ?? 0,
   };
 }
 
@@ -165,6 +187,14 @@ export function pickSpeed(lives, last, lifetime) {
 export function pickMtp(last, lifetime) {
   if (last?.mtp != null) return { pct: last.mtp, window: 'last' };
   if (lifetime?.mtp != null) return { pct: lifetime.mtp, window: 'lifetime' };
+  return null;
+}
+
+/** live (current prompts) -> last window -> lifetime -> null. */
+export function pickCache(live, last, lifetime) {
+  if (live) return { pct: live.pct, window: 'live', cached: live.cached, total: live.total };
+  if (last?.cache != null) return { pct: last.cache, window: 'last' };
+  if (lifetime?.cache != null) return { pct: lifetime.cache, window: 'lifetime' };
   return null;
 }
 
