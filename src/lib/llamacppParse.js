@@ -89,6 +89,7 @@ export function requestWindow(prevM, curM) {
     speed: speedOf(dTokens, d('tokens_predicted_seconds_total')),
     mtp: mtpOf(d('spec_decode_num_accepted_tokens_total'), d('spec_decode_num_draft_tokens_total')),
     cache: cacheOf(d('prompt_tokens_cached_total'), d('prompt_tokens_total')),
+    prefill: speedOf(d('prompt_tokens_total'), d('prompt_seconds_total')),
   };
 }
 
@@ -97,6 +98,7 @@ export function lifetimeStats(m) {
     speed: speedOf(m?.tokens_predicted_total, m?.tokens_predicted_seconds_total),
     mtp: mtpOf(m?.spec_decode_num_accepted_tokens_total, m?.spec_decode_num_draft_tokens_total),
     cache: cacheOf(m?.prompt_tokens_cached_total, m?.prompt_tokens_total),
+    prefill: speedOf(m?.prompt_tokens_total, m?.prompt_seconds_total),
   };
 }
 
@@ -108,16 +110,20 @@ export function liveCache(slots) {
   let cached = 0, total = 0;
   for (const s of Array.isArray(slots) ? slots : []) {
     if (!s?.is_processing) continue;
-    const t = num(s.n_prompt_tokens), c = num(s.n_prompt_tokens_cache);
+    // The prompt alone: n_prompt_tokens includes the tokens generated so far.
+    const seq = num(s.n_prompt_tokens), c = num(s.n_prompt_tokens_cache);
+    const t = seq == null ? null : seq - decoded(s);
     if (t == null || c == null || t <= 0 || c > t) continue;
     cached += c; total += t;
   }
   return total > 0 ? { pct: Math.round((cached / total) * 100), cached, total } : null;
 }
 
+// /slots n_prompt_tokens already counts the tokens generated so far
+// (prompt + n_decoded): it is the slot's whole sequence, not the prompt alone.
 export function contextFill(slot) {
   return {
-    used: (num(slot?.n_prompt_tokens) ?? 0) + decoded(slot),
+    used: num(slot?.n_prompt_tokens) ?? 0,
     total: num(slot?.n_ctx) ?? 0,
   };
 }
@@ -209,6 +215,23 @@ export function pickCache(live, last, lifetime) {
   if (last?.cache != null) return { pct: last.cache, window: 'last' };
   if (lifetime?.cache != null) return { pct: lifetime.cache, window: 'lifetime' };
   return null;
+}
+
+/** Prompt-reading speed (tok/s, cached tokens excluded): last window -> lifetime -> null. */
+export function pickPrefill(last, lifetime) {
+  if (last?.prefill != null) return { value: last.prefill, window: 'last' };
+  if (lifetime?.prefill != null) return { value: lifetime.prefill, window: 'lifetime' };
+  return null;
+}
+
+/**
+ * Longest sequence seen since engine start (/metrics n_tokens_max) against
+ * the largest slot context; null without either.
+ */
+export function contextPeak(metrics, slots) {
+  const tokens = num(metrics?.n_tokens_max);
+  const total = Math.max(0, ...(Array.isArray(slots) ? slots : []).map(s => num(s?.n_ctx) ?? 0));
+  return tokens != null && tokens > 0 && total > 0 ? { tokens, total } : null;
 }
 
 /** Empty between-poll state: nothing sampled yet. */

@@ -195,7 +195,7 @@ Rejected during design, recorded so it is not re-litigated:
 **Status:** 🔄 Released as v1.6.1 (cache hit rate on top of v1.6.0); screenshots open
 
 **Current step.** v1.6.1 is released. The Dockge stack builds `#dev` for the owner
-test of the prompt cache limit (item 21); after it, release v1.6.2 and back to `#main`.
+test of the prompt cache limit, prefill and peak (item 23); after it, release v1.6.2 and back to `#main`.
 Open: the owner supplies new screenshots and they replace the v1.5
 images in the README (item 16). Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
@@ -229,7 +229,9 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 18 | Acceptance: during a session the header shows `cache NN%` with the current request's token counts in the tooltip; after it the dimmed last-request value | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-14) |
 | 19 | Release v1.6.1: bump, merge dev → main, GitHub release; Dockge stack back on `#main` | ✅ Done |
 | 20 | Prompt cache limit (`--cache-ram`) in the engine app card, right column below KV, tooltip: limit, not usage | ✅ Done |
-| 21 | Acceptance: the llama.cpp app card shows `cache 32 GiB`; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
+| 21 | Prefill speed in the model card header; context peak since engine start (`Peak 179k (90%)`) in the app card | ✅ Done |
+| 22 | Fix: `/slots` `n_prompt_tokens` already includes generated tokens — Context no longer adds `n_decoded` twice, live cache share divides by the prompt alone | ✅ Done |
+| 23 | Acceptance: app card shows `cache 32 GiB` and `Peak`; header shows `prefill N tok/s`; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`

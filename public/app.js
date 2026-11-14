@@ -230,7 +230,7 @@ async function pollAll() {
     renderModels(data.models, eng, data.host);
     lastLoadedModels = eng.active === 'ollama' || !eng.enabled ? (data.models?.models || []) : [];
     if (modelsModalOpen) renderModelsModal();
-    renderEngineApp(data.engineApp, eng, data.host, data.models?.slots);
+    renderEngineApp(data.engineApp, eng, data.host, data.models?.slots, data.models?.peak);
     renderGpu(data.gpu);
     lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
     if (gpuModalBusId) renderGpuModal();
@@ -471,7 +471,7 @@ const WINDOW_TITLES = {
   lifetime: 'average since engine start',
 };
 
-// Header right side: ▶ 21.7 tok/s · MTP 61% · cache 96%. Only a live figure gets the marker.
+// Header right side: ▶ 21.7 tok/s · prefill 295 tok/s · MTP 61% · cache 96%. Only a live figure gets the marker.
 function renderSpeed(data, node) {
   node.textContent = '';
   node.hidden = false;
@@ -490,6 +490,12 @@ function renderSpeed(data, node) {
   if (sp && part.title === '') part.title = WINDOW_TITLES[sp.window] || '';
   node.appendChild(part);
 
+  if (data.prefill) {
+    node.appendChild(el('span', 'speed-dim', ' · '));
+    const pf = el('span', 'speed-dim', `prefill ${Math.round(data.prefill.value)} tok/s`);
+    pf.title = `prompt reading speed, cached tokens excluded — ${WINDOW_TITLES[data.prefill.window] || ''}`;
+    node.appendChild(pf);
+  }
   if (data.mtp) {
     node.appendChild(el('span', 'speed-dim', ' · '));
     const mtp = el('span', 'speed-dim', `MTP ${data.mtp.pct}%`);
@@ -790,7 +796,7 @@ const HOST_PARAMS = new Set(['threads', 'slots']);
 // load" (context, CPU, RAM, slots, threads), right "how the model runs"
 // (split, MTP, KV cache, prompt cache, batch, reasoning). An entry whose data is missing is
 // left out.
-function appEntries(data, slots, llama) {
+function appEntries(data, slots, llama, peak) {
   const left = [], right = [];
   if (llama) {
     (slots || []).forEach((sl, i) => {
@@ -800,6 +806,11 @@ function appEntries(data, slots, llama) {
         `${fmtK(sl.used)} / ${fmtK(sl.total)}`,
         `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)`));
     });
+  }
+  if (llama && peak?.total) {
+    const pct = Math.round(peak.tokens / peak.total * 100);
+    left.push(appRow('Peak', `${fmtK(peak.tokens)} (${pct}%)`,
+      `Longest sequence since engine start: ${peak.tokens.toLocaleString()} / ${peak.total.toLocaleString()} tokens of the slot context`));
   }
   if (data.cpu) {
     left.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
@@ -818,7 +829,7 @@ function appEntries(data, slots, llama) {
   return { left, right };
 }
 
-function renderEngineApp(data, eng, host, slots) {
+function renderEngineApp(data, eng, host, slots, peak) {
   const wrap = document.getElementById('engine-app-content');
   const title = document.getElementById('engine-app-title');
   const imageEl = document.getElementById('engine-app-image');
@@ -854,7 +865,7 @@ function renderEngineApp(data, eng, host, slots) {
   wrap.appendChild(statusRow);
 
   const list = el('div', 'app-rows');
-  const { left, right } = appEntries(data, slots, eng.active === 'llamacpp');
+  const { left, right } = appEntries(data, slots, eng.active === 'llamacpp', peak);
   // Nothing for the right column (Ollama): one full-width column.
   const cols = el('div', right.length ? 'app-cols' : 'app-cols single');
   for (const entries of right.length ? [left, right] : [left]) {

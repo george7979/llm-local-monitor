@@ -45,7 +45,7 @@ Owner/operator — the only person using the tool. Needs a quick view of server 
 
 - **FR1.1** Display host status (online/offline)
 - **FR1.1a** Detect the active engine (Ollama or llama.cpp) from the state of its TrueNAS app and show that engine's model, app stats and GPU badge. llama.cpp is optional: without `LLAMACPP_APP_NAME` the dashboard is Ollama-only
-- **FR1.2** Display list of actively loaded LLM models with parameters. Ollama: size, quantization, GPU/CPU usage, context, expiry time. llama.cpp: alias, parameter count, quantization, VRAM, context, plus generation speed (live while generating, last request when idle) MTP draft acceptance rate and prompt cache hit rate (current request while processing, last request when idle)
+- **FR1.2** Display list of actively loaded LLM models with parameters. Ollama: size, quantization, GPU/CPU usage, context, expiry time. llama.cpp: alias, parameter count, quantization, VRAM, context, plus generation speed (live while generating, last request when idle) prompt reading (prefill) speed, MTP draft acceptance rate and prompt cache hit rate (current request while processing, last request when idle)
 - **FR1.3** Display GPU stats: utilization, VRAM, temperature, power draw
 - **FR1.4** Display RAM breakdown: free / ZFS ARC / services
 - **FR1.5** Display the active engine's container stats: CPU%, RAM, app status, version, update availability. With llama.cpp also context fill per slot and the server's launch parameters

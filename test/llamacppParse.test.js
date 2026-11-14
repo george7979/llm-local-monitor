@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMetrics, formatParams, mapModelRow, slotSample, liveSpeed, activity,
   requestWindow, lifetimeStats, contextFill, launchParams,
-  overallActivity, countersWentBackwards, pickSpeed, pickMtp, formatCacheRam,
+  overallActivity, countersWentBackwards, pickSpeed, pickMtp, formatCacheRam, pickPrefill, contextPeak,
   cacheOf, liveCache, pickCache,
   initialState, advance, modelPayloadsOk,
 } from '../src/lib/llamacppParse.js';
@@ -32,15 +32,15 @@ test('formatParams', () => {
   assert.equal(formatParams(undefined), '');
 });
 test('lifetimeStats', () => {
-  assert.deepEqual(lifetimeStats(parseMetrics(METRICS)), { speed: 20, mtp: 60, cache: 100 });
-  assert.deepEqual(lifetimeStats({ tokens_predicted_total: 10, tokens_predicted_seconds_total: 2 }), { speed: 5, mtp: null, cache: null });
-  assert.deepEqual(lifetimeStats({ spec_decode_num_draft_tokens_total: 0 }), { speed: null, mtp: null, cache: null });
-  assert.deepEqual(lifetimeStats(null), { speed: null, mtp: null, cache: null });
+  assert.deepEqual(lifetimeStats(parseMetrics(METRICS)), { speed: 20, mtp: 60, cache: 100, prefill: null });
+  assert.deepEqual(lifetimeStats({ tokens_predicted_total: 10, tokens_predicted_seconds_total: 2 }), { speed: 5, mtp: null, cache: null, prefill: null });
+  assert.deepEqual(lifetimeStats({ spec_decode_num_draft_tokens_total: 0 }), { speed: null, mtp: null, cache: null, prefill: null });
+  assert.deepEqual(lifetimeStats(null), { speed: null, mtp: null, cache: null, prefill: null });
 });
 test('requestWindow', () => {
   const a = { tokens_predicted_total: 2000, tokens_predicted_seconds_total: 100, spec_decode_num_draft_tokens_total: 500, spec_decode_num_accepted_tokens_total: 300 };
   const b = { tokens_predicted_total: 2300, tokens_predicted_seconds_total: 110, spec_decode_num_draft_tokens_total: 700, spec_decode_num_accepted_tokens_total: 350 };
-  assert.deepEqual(requestWindow(a, b), { speed: 30, mtp: 25, cache: null });
+  assert.deepEqual(requestWindow(a, b), { speed: 30, mtp: 25, cache: null, prefill: null });
   assert.equal(requestWindow(a, a), null);          // nothing finished
   assert.equal(requestWindow(b, a), null);          // counters went backwards
   assert.equal(requestWindow(null, b), null);
@@ -48,16 +48,16 @@ test('requestWindow', () => {
 test('requestWindow: no bogus values from partial counters', () => {
   const a = { tokens_predicted_total: 10, tokens_predicted_seconds_total: 1 };
   // no MTP counters, seconds did not move
-  assert.deepEqual(requestWindow(a, { tokens_predicted_total: 20, tokens_predicted_seconds_total: 1 }), { speed: null, mtp: null, cache: null });
+  assert.deepEqual(requestWindow(a, { tokens_predicted_total: 20, tokens_predicted_seconds_total: 1 }), { speed: null, mtp: null, cache: null, prefill: null });
   // no MTP counters at all
-  assert.deepEqual(requestWindow(a, { tokens_predicted_total: 20, tokens_predicted_seconds_total: 2 }), { speed: 10, mtp: null, cache: null });
+  assert.deepEqual(requestWindow(a, { tokens_predicted_total: 20, tokens_predicted_seconds_total: 2 }), { speed: 10, mtp: null, cache: null, prefill: null });
   // draft counter reset while tokens grew: mtp null, never negative
   const c = { ...a, spec_decode_num_draft_tokens_total: 100, spec_decode_num_accepted_tokens_total: 50 };
   const d = { tokens_predicted_total: 20, tokens_predicted_seconds_total: 2, spec_decode_num_draft_tokens_total: 10, spec_decode_num_accepted_tokens_total: 5 };
-  assert.deepEqual(requestWindow(c, d), { speed: 10, mtp: null, cache: null });
+  assert.deepEqual(requestWindow(c, d), { speed: 10, mtp: null, cache: null, prefill: null });
   // draft counter unchanged: no division by zero
   const e = { ...c, tokens_predicted_total: 20, tokens_predicted_seconds_total: 2 };
-  assert.deepEqual(requestWindow(c, e), { speed: 10, mtp: null, cache: null });
+  assert.deepEqual(requestWindow(c, e), { speed: 10, mtp: null, cache: null, prefill: null });
 });
 test('liveSpeed', () => {
   const p = { ts: 1000, idTask: 7, nDecoded: 100, processing: true };
@@ -77,7 +77,7 @@ const SLOT = { id: 0, n_ctx: 131072, is_processing: true, id_task: 7, n_prompt_t
                next_token: [{ n_decoded: 500, n_remain: 100, has_next_token: true }] };
 test('slot helpers', () => {
   assert.deepEqual(slotSample(SLOT, 5), { ts: 5, idTask: 7, nDecoded: 500, processing: true });
-  assert.deepEqual(contextFill(SLOT), { used: 80500, total: 131072 });
+  assert.deepEqual(contextFill(SLOT), { used: 80000, total: 131072 });
   assert.equal(activity(SLOT), 'generating');
   assert.equal(activity({ ...SLOT, next_token: [{ n_decoded: 0 }] }), 'reading');
   assert.equal(activity({ ...SLOT, is_processing: false }), 'idle');
@@ -224,9 +224,9 @@ test('requestWindow: cache from counter deltas', () => {
   assert.equal(requestWindow(a, b).cache, 90);
 });
 test('liveCache: busy slots only, summed', () => {
-  assert.deepEqual(liveCache([SLOT]), { pct: 94, cached: 75000, total: 80000 });
+  assert.deepEqual(liveCache([SLOT]), { pct: 94, cached: 75000, total: 79500 }); // 80000 - 500 decoded
   assert.deepEqual(liveCache([SLOT, { ...SLOT, id: 1, n_prompt_tokens: 20000, n_prompt_tokens_cache: 0 }]),
-    { pct: 75, cached: 75000, total: 100000 });
+    { pct: 76, cached: 75000, total: 99000 });
   assert.equal(liveCache([{ ...SLOT, is_processing: false }]), null);
   assert.equal(liveCache([{ ...SLOT, n_prompt_tokens: 0 }]), null);
   assert.equal(liveCache([{ ...SLOT, n_prompt_tokens_cache: undefined }]), null);
@@ -257,4 +257,28 @@ test('formatCacheRam', () => {
   assert.equal(formatCacheRam('-1'), 'no limit');
   assert.equal(formatCacheRam('0'), 'off');
   assert.equal(formatCacheRam('abc'), 'abc');
+});
+
+test('prefill: tok/s of prompt reading, window then lifetime', () => {
+  assert.equal(lifetimeStats({ prompt_tokens_total: 528782, prompt_seconds_total: 1793.14 }).prefill, 294.9);
+  const a = { tokens_predicted_total: 10, tokens_predicted_seconds_total: 1, prompt_tokens_total: 1000, prompt_seconds_total: 4 };
+  const b = { tokens_predicted_total: 20, tokens_predicted_seconds_total: 2, prompt_tokens_total: 1600, prompt_seconds_total: 6 };
+  assert.equal(requestWindow(a, b).prefill, 300);
+  assert.deepEqual(pickPrefill({ prefill: 300 }, { prefill: 250 }), { value: 300, window: 'last' });
+  assert.deepEqual(pickPrefill({ prefill: null }, { prefill: 250 }), { value: 250, window: 'lifetime' });
+  assert.equal(pickPrefill(null, null), null);
+});
+test('contextPeak: n_tokens_max against the largest slot context', () => {
+  assert.deepEqual(contextPeak({ n_tokens_max: 179366 }, [{ n_ctx: 200192 }]), { tokens: 179366, total: 200192 });
+  assert.deepEqual(contextPeak({ n_tokens_max: 10 }, [{ n_ctx: 100 }, { n_ctx: 200 }]), { tokens: 10, total: 200 });
+  assert.equal(contextPeak({ n_tokens_max: 0 }, [{ n_ctx: 100 }]), null);
+  assert.equal(contextPeak(null, [{ n_ctx: 100 }]), null);
+  assert.equal(contextPeak({ n_tokens_max: 10 }, null), null);
+});
+
+test('n_prompt_tokens counts generated tokens: live sample from b12359', () => {
+  const slot = { id: 0, n_ctx: 200192, is_processing: true, id_task: 80644, n_prompt_tokens: 56007,
+                 n_prompt_tokens_cache: 45920, n_prompt_tokens_processed: 6275, next_token: [{ n_decoded: 3808 }] };
+  assert.equal(contextFill(slot).used, 56007);
+  assert.deepEqual(liveCache([slot]), { pct: 88, cached: 45920, total: 52199 });
 });
