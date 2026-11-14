@@ -471,7 +471,7 @@ const WINDOW_TITLES = {
   lifetime: 'average since engine start',
 };
 
-// Header right side: ▶ 21.7 tok/s · pp 295/s · MTP 61% · cache 96%; wraps at the separators. Only a live figure gets the marker.
+// Header right side: ▶ 21.7 tok/s · prefill 295 tok/s · MTP 61% · cache 96%; wraps at the separators. Only a live figure gets the marker.
 function renderSpeed(data, node) {
   node.textContent = '';
   node.hidden = false;
@@ -492,8 +492,8 @@ function renderSpeed(data, node) {
 
   if (data.prefill) {
     node.appendChild(el('span', 'speed-dim speed-sep', ' · '));
-    const pf = el('span', 'speed-dim', `pp ${Math.round(data.prefill.value)}/s`);
-    pf.title = `prompt processing (prefill) ${data.prefill.value} tok/s, cached tokens excluded — ${WINDOW_TITLES[data.prefill.window] || ''}`;
+    const pf = el('span', 'speed-dim', `prefill ${Math.round(data.prefill.value)} tok/s`);
+    pf.title = `prompt reading speed ${data.prefill.value} tok/s, cached tokens excluded — ${WINDOW_TITLES[data.prefill.window] || ''}`;
     node.appendChild(pf);
   }
   if (data.mtp) {
