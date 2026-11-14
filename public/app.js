@@ -788,7 +788,7 @@ const HOST_PARAMS = new Set(['threads', 'slots']);
 
 // The card's entries in two columns grouped by subject — left "host and
 // load" (context, CPU, RAM, slots, threads), right "how the model runs"
-// (split, MTP, KV cache, batch, reasoning). An entry whose data is missing is
+// (split, MTP, KV cache, prompt cache, batch, reasoning). An entry whose data is missing is
 // left out.
 function appEntries(data, slots, llama) {
   const left = [], right = [];
@@ -812,7 +812,7 @@ function appEntries(data, slots, llama) {
   if (llama) {
     // Launch parameters, read-only; the full command is the tooltip.
     for (const p of data.launch?.params || []) {
-      (HOST_PARAMS.has(p.label) ? left : right).push(appRow(p.label, p.value, data.launch.command || ''));
+      (HOST_PARAMS.has(p.label) ? left : right).push(appRow(p.label, p.value, p.title || data.launch.command || ''));
     }
   }
   return { left, right };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMetrics, formatParams, mapModelRow, slotSample, liveSpeed, activity,
   requestWindow, lifetimeStats, contextFill, launchParams,
-  overallActivity, countersWentBackwards, pickSpeed, pickMtp,
+  overallActivity, countersWentBackwards, pickSpeed, pickMtp, formatCacheRam,
   cacheOf, liveCache, pickCache,
   initialState, advance, modelPayloadsOk,
 } from '../src/lib/llamacppParse.js';
@@ -238,4 +238,23 @@ test('pickCache: live, then last, then lifetime, then null', () => {
   assert.deepEqual(pickCache(null, { cache: 50 }, { cache: 40 }), { pct: 50, window: 'last' });
   assert.deepEqual(pickCache(null, { cache: null }, { cache: 0 }), { pct: 0, window: 'lifetime' });
   assert.equal(pickCache(null, null, { cache: null }), null);
+});
+
+test('launchParams: --cache-ram after KV, with its own tooltip', () => {
+  const r = launchParams(['-ctk', 'q8_0', '-ctv', 'q8_0', '-b', '4096', '--cache-ram', '32768']);
+  assert.deepEqual(r.map(p => p.label), ['KV', 'cache', 'batch']);
+  assert.equal(r[1].value, '32 GiB');
+  assert.match(r[1].title, /not report/);
+  assert.equal(launchParams(['-cram', '-1'])[0].value, 'no limit');
+  assert.equal(launchParams(['--cache-ram=0'])[0].value, 'off');
+  assert.deepEqual(launchParams(['-c', '8192']), []); // default 8 GiB not shown, as other absent flags
+});
+test('formatCacheRam', () => {
+  assert.equal(formatCacheRam('32768'), '32 GiB');
+  assert.equal(formatCacheRam('12288'), '12 GiB');
+  assert.equal(formatCacheRam('1536'), '1.5 GiB');
+  assert.equal(formatCacheRam('512'), '512 MiB');
+  assert.equal(formatCacheRam('-1'), 'no limit');
+  assert.equal(formatCacheRam('0'), 'off');
+  assert.equal(formatCacheRam('abc'), 'abc');
 });

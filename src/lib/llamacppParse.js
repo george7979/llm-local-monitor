@@ -134,6 +134,17 @@ function flagValue(args, names) {
   return undefined;
 }
 
+/** --cache-ram value (MiB) for display: 32768 -> '32 GiB', 512 -> '512 MiB', -1 -> 'no limit', 0 -> 'off'. */
+export function formatCacheRam(v) {
+  const n = Number(v);
+  if (v == null || v === '' || !Number.isInteger(n)) return v;
+  if (n < 0) return 'no limit';
+  if (n === 0) return 'off';
+  return n >= 1024 ? `${Math.round((n / 1024) * 10) / 10} GiB` : `${n} MiB`;
+}
+
+const CACHE_RAM_TITLE = 'Prompt cache limit in host RAM (--cache-ram); llama-server does not report how much of it is in use';
+
 /** Fixed-order list of the launch parameters worth showing; unknown flags ignored. */
 export function launchParams(command) {
   if (!Array.isArray(command)) return [];
@@ -151,6 +162,8 @@ export function launchParams(command) {
   add('slots', flagValue(command, ['-np', '--parallel']));
   add('threads', flagValue(command, ['-t', '--threads']));
   add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])));
+  const cram = flagValue(command, ['-cram', '--cache-ram']);
+  if (cram != null && cram !== '') out.push({ label: 'cache', value: formatCacheRam(cram), title: CACHE_RAM_TITLE });
   const b = flagValue(command, ['-b', '--batch-size']);
   const ub = flagValue(command, ['-ub', '--ubatch-size']);
   add('batch', b && ub ? `${b} / ${ub}` : b || ub);
