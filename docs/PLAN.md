@@ -192,11 +192,10 @@ Rejected during design, recorded so it is not re-litigated:
 
 ## Milestone: v1.6.0 — llama.cpp as an alternative engine
 
-**Status:** 🔄 Released as v1.6.0; screenshots open
+**Status:** 🔄 Released as v1.6.1 (cache hit rate on top of v1.6.0); screenshots open
 
-**Current step.** v1.6.0 is released. The Dockge stack builds `#dev` for the owner
-test of the cache hit rate (item 18); after it, back to `#main` with the next release.
-Open: the owner supplies new screenshots and they replace the v1.5
+**Current step.** v1.6.1 is released and runs in production (Dockge stack on
+`#main`). Open: the owner supplies new screenshots and they replace the v1.5
 images in the README (item 16). Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
 
@@ -226,7 +225,8 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with v1.6.0 shots (the owner supplies them once production shows v1.6.0) | ⬜ Open |
 
 | 17 | Prompt cache hit rate in the llama.cpp model card header (`cache NN%`): current request from `/slots`, otherwise last window / lifetime from `/metrics` | ✅ Done |
-| 18 | Acceptance: during a session the header shows `cache NN%` with the current request's token counts in the tooltip; after it the dimmed last-request value | ⬜ Owner test on the `#dev` build |
+| 18 | Acceptance: during a session the header shows `cache NN%` with the current request's token counts in the tooltip; after it the dimmed last-request value | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-14) |
+| 19 | Release v1.6.1: bump, merge dev → main, GitHub release; Dockge stack back on `#main` | ✅ Done |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
