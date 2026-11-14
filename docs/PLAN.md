@@ -231,7 +231,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 20 | Prompt cache limit (`--cache-ram`) in the engine app card, right column below KV, tooltip: limit, not usage | ✅ Done |
 | 21 | Prefill speed in the model card header; context peak since engine start (`Peak 179k (90%)`) in the app card | ✅ Done |
 | 22 | Fix: `/slots` `n_prompt_tokens` already includes generated tokens — Context no longer adds `n_decoded` twice, live cache share divides by the prompt alone | ✅ Done |
-| 23 | Acceptance: app card shows `cache 32 GiB` and `Peak`; header shows `prefill N tok/s`; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
+| 23 | Acceptance: app card shows `cache 32 GiB` and `Peak`; header shows `pp N/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
