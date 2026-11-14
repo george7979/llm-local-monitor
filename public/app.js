@@ -471,7 +471,7 @@ const WINDOW_TITLES = {
   lifetime: 'average since engine start',
 };
 
-// Header right side: ▶ 21.7 tok/s · MTP 61%. Only a live figure gets the marker.
+// Header right side: ▶ 21.7 tok/s · MTP 61% · cache 96%. Only a live figure gets the marker.
 function renderSpeed(data, node) {
   node.textContent = '';
   node.hidden = false;
@@ -495,6 +495,16 @@ function renderSpeed(data, node) {
     const mtp = el('span', 'speed-dim', `MTP ${data.mtp.pct}%`);
     mtp.title = WINDOW_TITLES[data.mtp.window] || '';
     node.appendChild(mtp);
+  }
+
+  if (data.cache) {
+    const c = data.cache;
+    node.appendChild(el('span', 'speed-dim', ' · '));
+    const span = el('span', 'speed-dim', `cache ${c.pct}%`);
+    span.title = c.window === 'live'
+      ? `current request: ${c.cached.toLocaleString()} of ${c.total.toLocaleString()} prompt tokens from cache`
+      : `prompt tokens from cache — ${WINDOW_TITLES[c.window] || ''}`;
+    node.appendChild(span);
   }
 }
 
@@ -788,8 +798,7 @@ function appEntries(data, slots, llama) {
       const pct = Math.round(sl.used / sl.total * 100);
       left.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
         `${fmtK(sl.used)} / ${fmtK(sl.total)}`,
-        `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)` +
-          (sl.cached ? `, ${sl.cached.toLocaleString()} from cache` : '')));
+        `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)`));
     });
   }
   if (data.cpu) {
