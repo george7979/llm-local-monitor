@@ -788,15 +788,14 @@ function appRow(key, value, title) {
   return row;
 }
 
-// Launch parameters that describe the host side of the engine; the rest
-// describe how the model is run.
-// Launch parameters about the host go to the left column, in this order
-// (cache-ram right below RAM); the rest stay on the right.
+// Launch parameters about the host side, shown in the left column in this
+// order (prompt cache limit right below RAM); the rest describe how the model
+// is run and stay on the right.
 const HOST_PARAMS = ['cache', 'slots', 'threads'];
 
 // The card's entries in two columns grouped by subject — left "host and
-// load" (context, CPU, RAM, slots, threads), right "how the model runs"
-// (split, MTP, KV cache, prompt cache, batch, reasoning). An entry whose data is missing is
+// load" (context, peak, CPU, RAM, prompt cache, slots, threads), right "how
+// the model runs" (split, MTP, KV cache, batch, reasoning, output limit). An entry whose data is missing is
 // left out.
 function appEntries(data, slots, llama, peak) {
   const left = [], right = [];
