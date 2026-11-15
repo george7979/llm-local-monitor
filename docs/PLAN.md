@@ -242,6 +242,24 @@ Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
 
 ---
 
+## Milestone: v1.6.3 — Output limit: server default vs the current request
+
+**Status:** ⬜ Planned (owner decision 2026-11-15)
+
+`-n` / `--n-predict` is only a default: llama-server takes a request's own `max_tokens` /
+`n_predict` first and falls back to `-n` when the request sets none (`slot.n_predict_max` in
+`tools/server/server-context.cpp`). `/props` → `default_generation_settings.params.n_predict` is
+always `-1` whatever `-n` says — it is built from a fresh `task_params`, so it cannot be used to
+check the flag. The current request's limit is in `/slots` → `params.n_predict`.
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | `out` tooltip: default output limit for requests that set none (`-n` / `--n-predict`); a request's `max_tokens` overrides it | ⬜ |
+| 2 | While a slot is processing and its `params.n_predict` is set (not `-1`) and differs from `-n`, the row shows both: `out 32k · req 40k`; otherwise only the server value | ⬜ |
+| 3 | Unit tests for the pure part; owner acceptance on the `#dev` build; release v1.6.3 | ⬜ |
+
+---
+
 ## v2 Backlog (after v1 stabilization)
 
 - [ ] SQLite: per-minute GPU/memory samples, 7-day retention
