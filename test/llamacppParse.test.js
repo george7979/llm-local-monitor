@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMetrics, formatParams, mapModelRow, slotSample, liveSpeed, activity,
   requestWindow, lifetimeStats, contextFill, launchParams,
-  overallActivity, countersWentBackwards, pickSpeed, pickMtp, formatCacheRam, pickPrefill, contextPeak,
+  overallActivity, countersWentBackwards, pickSpeed, pickMtp, formatCacheRam, formatNPredict, pickPrefill, contextPeak,
   cacheOf, liveCache, pickCache,
   initialState, advance, modelPayloadsOk,
 } from '../src/lib/llamacppParse.js';
@@ -281,4 +281,22 @@ test('n_prompt_tokens counts generated tokens: live sample from b12359', () => {
                  n_prompt_tokens_cache: 45920, n_prompt_tokens_processed: 6275, next_token: [{ n_decoded: 3808 }] };
   assert.equal(contextFill(slot).used, 56007);
   assert.deepEqual(liveCache([slot]), { pct: 88, cached: 45920, total: 52199 });
+});
+
+test('launchParams: --n-predict as out, after reasoning; no limit shows nothing', () => {
+  const title = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
+  assert.deepEqual(launchParams(['--reasoning-budget', '4096', '-n', '32768']),
+    [{ label: 'reasoning', value: '4096' }, { label: 'out', value: '32k', title }]);
+  assert.deepEqual(launchParams(['--n-predict', '1000']), [{ label: 'out', value: '1000', title }]);
+  assert.deepEqual(launchParams(['-n', '-1']), []);
+  assert.deepEqual(launchParams(['-np', '1']), [{ label: 'slots', value: '1' }]);
+});
+test('formatNPredict', () => {
+  assert.equal(formatNPredict('32768'), '32k');
+  assert.equal(formatNPredict('4096'), '4k');
+  assert.equal(formatNPredict('1000'), '1000');
+  assert.equal(formatNPredict('-1'), null);
+  assert.equal(formatNPredict('-2'), null);
+  assert.equal(formatNPredict('0'), null);
+  assert.equal(formatNPredict('abc'), null);
 });

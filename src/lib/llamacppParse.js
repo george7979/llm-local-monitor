@@ -149,6 +149,15 @@ export function formatCacheRam(v) {
   return n >= 1024 ? `${Math.round((n / 1024) * 10) / 10} GiB` : `${n} MiB`;
 }
 
+const N_PREDICT_TITLE = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
+
+/** --n-predict as shown: 32768 → '32k', 1000 → '1000'; -1 / 0 / -2 (no fixed limit) and non-numbers → null. */
+export function formatNPredict(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n % 1024 === 0 ? `${n / 1024}k` : String(n);
+}
+
 const CACHE_RAM_TITLE = 'Prompt cache limit in host RAM (--cache-ram); llama-server does not report how much of it is in use';
 
 /** Fixed-order list of the launch parameters worth showing; unknown flags ignored. */
@@ -174,6 +183,8 @@ export function launchParams(command) {
   const ub = flagValue(command, ['-ub', '--ubatch-size']);
   add('batch', b && ub ? `${b} / ${ub}` : b || ub);
   add('reasoning', flagValue(command, ['--reasoning-budget']));
+  const np = formatNPredict(flagValue(command, ['-n', '--n-predict']));
+  if (np) out.push({ label: 'out', value: np, title: N_PREDICT_TITLE });
   return out;
 }
 
