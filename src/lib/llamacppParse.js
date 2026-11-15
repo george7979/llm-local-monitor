@@ -140,7 +140,7 @@ function flagValue(args, names) {
   return undefined;
 }
 
-/** --cache-ram value (MiB) for display: 32768 -> '32 GiB', 512 -> '512 MiB', -1 -> 'no limit', 0 -> 'off'. */
+/** --cache-ram value (MiB) for display: 16384 -> '16 GiB', 512 -> '512 MiB', -1 -> 'no limit', 0 -> 'off'. */
 export function formatCacheRam(v) {
   const n = Number(v);
   if (v == null || v === '' || !Number.isInteger(n)) return v;
@@ -153,7 +153,7 @@ const SPLIT_TITLE = 'How the model is split across GPUs (-sm / --split-mode): la
 
 const N_PREDICT_TITLE = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
 
-/** --n-predict as shown: 32768 → '32k', 1000 → '1000'; -1 / 0 / -2 (no fixed limit) and non-numbers → null. */
+/** --n-predict as shown: 8192 → '8k', 1000 → '1000'; -1 / 0 / -2 (no fixed limit) and non-numbers → null. */
 export function formatNPredict(v) {
   const n = Number(v);
   if (!Number.isInteger(n) || n <= 0) return null;
