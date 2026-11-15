@@ -195,7 +195,7 @@ Rejected during design, recorded so it is not re-litigated:
 **Status:** 🔄 Released as v1.6.1 (cache hit rate on top of v1.6.0); screenshots open
 
 **Current step.** v1.6.1 is released. The Dockge stack builds `#dev` for the owner
-test of the prompt cache limit, output limit, prefill and peak (item 27); after it, release v1.6.2 and back to `#main`.
+test of the prompt cache limit, output limit, prefill and peak (item 28); after it, release v1.6.2 and back to `#main`.
 Open: the owner supplies new screenshots and they replace the v1.5
 images in the README (item 16). Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
@@ -235,7 +235,8 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 24 | App card columns: prompt cache limit moves to the left column below RAM (then slots, threads); split mode gets a tooltip explaining the modes | ✅ Done |
 | 25 | Tooltips for every app card entry: each launch parameter says what it does and its flag, RAM says usage / limit; the full launch command moves to the image name's tooltip | ✅ Done |
 | 26 | Tooltips outside the app card where a value is easy to misread: `ZFS ARC`, GPU `UTIL`, PCIe badge (owner's pick from the review) | ✅ Done |
-| 27 | Acceptance: app card shows `cache` below `RAM`, `out 32k`, `Peak`, a tooltip on every entry and the full command on the image name; tooltips on `ZFS ARC`, `UTIL` and the PCIe badge; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
+| 27 | App card left column: Context and Peak move to the end, after threads, so the rows above stay in place at engine start | ✅ Done |
+| 28 | Acceptance: app card shows `cache` below `RAM`, Context and Peak at the end of the left column, `out 32k`, `Peak`, a tooltip on every entry and the full command on the image name; tooltips on `ZFS ARC`, `UTIL` and the PCIe badge; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`

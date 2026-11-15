@@ -801,25 +801,11 @@ function appRow(key, value, title) {
 const HOST_PARAMS = ['cache', 'slots', 'threads'];
 
 // The card's entries in two columns grouped by subject — left "host and
-// load" (context, peak, CPU, RAM, prompt cache, slots, threads), right "how
+// load" (CPU, RAM, prompt cache, slots, threads, context, peak), right "how
 // the model runs" (split, MTP, KV cache, batch, reasoning, output limit). An entry whose data is missing is
 // left out.
 function appEntries(data, slots, llama, peak) {
   const left = [], right = [];
-  if (llama) {
-    (slots || []).forEach((sl, i) => {
-      if (!sl.total) return;
-      const pct = Math.round(sl.used / sl.total * 100);
-      left.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
-        `${fmtK(sl.used)} / ${fmtK(sl.total)}`,
-        `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)`));
-    });
-  }
-  if (llama && peak?.total) {
-    const pct = Math.round(peak.tokens / peak.total * 100);
-    left.push(appRow('Peak', `${fmtK(peak.tokens)} (${pct}%)`,
-      `Longest sequence since engine start: ${peak.tokens.toLocaleString()} / ${peak.total.toLocaleString()} tokens of the slot context`));
-  }
   if (data.cpu) {
     left.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
       'Share of all host cores used by the app container'));
@@ -839,6 +825,22 @@ function appEntries(data, slots, llama, peak) {
       if (p) left.push(row(p));
     }
     for (const p of params) if (!HOST_PARAMS.includes(p.label)) right.push(row(p));
+  }
+  // Context and peak last: they are missing while the model loads and before the
+  // first request, so the rows above stay in place when they appear.
+  if (llama) {
+    (slots || []).forEach((sl, i) => {
+      if (!sl.total) return;
+      const pct = Math.round(sl.used / sl.total * 100);
+      left.push(appRow(slots.length > 1 ? `Context ${i + 1}` : 'Context',
+        `${fmtK(sl.used)} / ${fmtK(sl.total)}`,
+        `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)`));
+    });
+  }
+  if (llama && peak?.total) {
+    const pct = Math.round(peak.tokens / peak.total * 100);
+    left.push(appRow('Peak', `${fmtK(peak.tokens)} (${pct}%)`,
+      `Longest sequence since engine start: ${peak.tokens.toLocaleString()} / ${peak.total.toLocaleString()} tokens of the slot context`));
   }
   return { left, right };
 }
