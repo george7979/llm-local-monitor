@@ -243,16 +243,16 @@ test('pickCache: live, then last, then lifetime, then null', () => {
 });
 
 test('launchParams: --cache-ram after KV, with its own tooltip', () => {
-  const r = launchParams(['-ctk', 'q8_0', '-ctv', 'q8_0', '-b', '4096', '--cache-ram', '32768']);
+  const r = launchParams(['-ctk', 'q8_0', '-ctv', 'q8_0', '-b', '4096', '--cache-ram', '16384']);
   assert.deepEqual(r.map(p => p.label), ['KV', 'cache', 'batch']);
-  assert.equal(r[1].value, '32 GiB');
+  assert.equal(r[1].value, '16 GiB');
   assert.match(r[1].title, /not report/);
   assert.equal(launchParams(['-cram', '-1'])[0].value, 'no limit');
   assert.equal(launchParams(['--cache-ram=0'])[0].value, 'off');
   assert.deepEqual(launchParams(['-c', '8192']), []); // default 8 GiB not shown, as other absent flags
 });
 test('formatCacheRam', () => {
-  assert.equal(formatCacheRam('32768'), '32 GiB');
+  assert.equal(formatCacheRam('65536'), '64 GiB');
   assert.equal(formatCacheRam('12288'), '12 GiB');
   assert.equal(formatCacheRam('1536'), '1.5 GiB');
   assert.equal(formatCacheRam('512'), '512 MiB');
@@ -271,7 +271,7 @@ test('prefill: tok/s of prompt reading, window then lifetime', () => {
   assert.equal(pickPrefill(null, null), null);
 });
 test('contextPeak: n_tokens_max against the largest slot context', () => {
-  assert.deepEqual(contextPeak({ n_tokens_max: 179366 }, [{ n_ctx: 200192 }]), { tokens: 179366, total: 200192 });
+  assert.deepEqual(contextPeak({ n_tokens_max: 98304 }, [{ n_ctx: 131072 }]), { tokens: 98304, total: 131072 });
   assert.deepEqual(contextPeak({ n_tokens_max: 10 }, [{ n_ctx: 100 }, { n_ctx: 200 }]), { tokens: 10, total: 200 });
   assert.equal(contextPeak({ n_tokens_max: 0 }, [{ n_ctx: 100 }]), null);
   assert.equal(contextPeak(null, [{ n_ctx: 100 }]), null);
@@ -279,7 +279,7 @@ test('contextPeak: n_tokens_max against the largest slot context', () => {
 });
 
 test('n_prompt_tokens counts generated tokens: live sample from b12359', () => {
-  const slot = { id: 0, n_ctx: 200192, is_processing: true, id_task: 80644, n_prompt_tokens: 56007,
+  const slot = { id: 0, n_ctx: 131072, is_processing: true, id_task: 80644, n_prompt_tokens: 56007,
                  n_prompt_tokens_cache: 45920, n_prompt_tokens_processed: 6275, next_token: [{ n_decoded: 3808 }] };
   assert.equal(contextFill(slot).used, 56007);
   assert.deepEqual(liveCache([slot]), { pct: 88, cached: 45920, total: 52199 });
@@ -287,14 +287,14 @@ test('n_prompt_tokens counts generated tokens: live sample from b12359', () => {
 
 test('launchParams: --n-predict as out, after reasoning; no limit shows nothing', () => {
   const title = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
-  assert.deepEqual(lv(['--reasoning-budget', '4096', '-n', '32768']),
-    [{ label: 'reasoning', value: '4096' }, { label: 'out', value: '32k' }]);
+  assert.deepEqual(lv(['--reasoning-budget', '2048', '-n', '8192']),
+    [{ label: 'reasoning', value: '2048' }, { label: 'out', value: '8k' }]);
   assert.deepEqual(launchParams(['--n-predict', '1000']), [{ label: 'out', value: '1000', title }]);
   assert.deepEqual(launchParams(['-n', '-1']), []);
   assert.deepEqual(lv(['-np', '1']), [{ label: 'slots', value: '1' }]);
 });
 test('formatNPredict', () => {
-  assert.equal(formatNPredict('32768'), '32k');
+  assert.equal(formatNPredict('16384'), '16k');
   assert.equal(formatNPredict('4096'), '4k');
   assert.equal(formatNPredict('1000'), '1000');
   assert.equal(formatNPredict('-1'), null);
@@ -304,13 +304,13 @@ test('formatNPredict', () => {
 });
 
 test('launchParams: every entry has a tooltip; speculative tooltips carry the configured values', () => {
-  const cmd = ['-sm', 'tensor', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '4', '-np', '1', '-t', '12',
-               '-ctk', 'q8_0', '-ctv', 'q8_0', '--cache-ram', '49152', '-b', '4096', '-ub', '2048',
-               '--reasoning-budget', '4096', '-n', '32768'];
+  const cmd = ['-sm', 'row', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '3', '-np', '2', '-t', '8',
+               '-ctk', 'f16', '-ctv', 'f16', '--cache-ram', '16384', '-b', '2048', '-ub', '512',
+               '--reasoning-budget', '2048', '-n', '8192'];
   const r = launchParams(cmd);
   assert.deepEqual(r.map(p => p.label), ['split', 'MTP', 'slots', 'threads', 'KV', 'cache', 'batch', 'reasoning', 'out']);
   for (const p of r) assert.ok(p.title && p.title.length > 20, `${p.label} has a tooltip`);
-  assert.match(r[1].title, /draft-mtp.*up to 4 tokens/);
+  assert.match(r[1].title, /draft-mtp.*up to 3 tokens/);
   assert.match(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '3'])[0].title, /ngram.*up to 3 tokens/);
   assert.doesNotMatch(launchParams(['--spec-type', 'mtp'])[0].title, /up to/);
 });

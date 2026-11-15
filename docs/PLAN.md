@@ -192,11 +192,10 @@ Rejected during design, recorded so it is not re-litigated:
 
 ## Milestone: v1.6.0 — llama.cpp as an alternative engine
 
-**Status:** 🔄 Released as v1.6.2 (cache hit rate, prefill, context peak, launch parameter tooltips on top of v1.6.0); screenshots open
+**Status:** ✅ Released as v1.6.2 (cache hit rate, prefill, context peak, launch parameter tooltips on top of v1.6.0)
 
 **Current step.** v1.6.2 is released and the Dockge stack builds `#main`.
-Open: the owner supplies new screenshots and they replace the v1.5
-images in the README (item 16). Development rule: no switch or restart of the engine on
+Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
 
 The dashboard follows whichever engine is active — Ollama or a llama.cpp server
@@ -222,20 +221,20 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
 | 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ✅ Done |
 | 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ✅ Done — compose on `#main`, `/api/config` reports `1.6.0`, no collector errors |
-| 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with v1.6.0 shots (the owner supplies them once production shows v1.6.0) | ⬜ Open |
+| 16 | README screenshot: one dashboard shot in a dark and a light version, chosen by the reader's `prefers-color-scheme`; the v1.5 shots are gone, the "Available models" one without a replacement (the text describes the dialog). Merged to `main` with the neutral example values, without a version bump, tag or GitHub release — neither changes the running code | ✅ Done |
 
 | 17 | Prompt cache hit rate in the llama.cpp model card header (`cache NN%`): current request from `/slots`, otherwise last window / lifetime from `/metrics` | ✅ Done |
 | 18 | Acceptance: during a session the header shows `cache NN%` with the current request's token counts in the tooltip; after it the dimmed last-request value | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-14) |
 | 19 | Release v1.6.1: bump, merge dev → main, GitHub release; Dockge stack back on `#main` | ✅ Done |
 | 20 | Prompt cache limit (`--cache-ram`) in the engine app card, right column below KV, tooltip: limit, not usage | ✅ Done |
-| 21 | Prefill speed in the model card header; context peak since engine start (`Peak 179k (90%)`) in the app card | ✅ Done |
+| 21 | Prefill speed in the model card header; context peak since engine start (`Peak 96k (75%)`) in the app card | ✅ Done |
 | 22 | Fix: `/slots` `n_prompt_tokens` already includes generated tokens — Context no longer adds `n_decoded` twice, live cache share divides by the prompt alone | ✅ Done |
-| 23 | Per-request output limit (`-n` / `--n-predict`) in the app card launch parameters as `out 32k`, after `reasoning` | ✅ Done |
+| 23 | Per-request output limit (`-n` / `--n-predict`) in the app card launch parameters as `out 8k`, after `reasoning` | ✅ Done |
 | 24 | App card columns: prompt cache limit moves to the left column below RAM (then slots, threads); split mode gets a tooltip explaining the modes | ✅ Done |
 | 25 | Tooltips for every app card entry: each launch parameter says what it does and its flag, RAM says usage / limit; the full launch command moves to the image name's tooltip | ✅ Done |
 | 26 | Tooltips outside the app card where a value is easy to misread: `ZFS ARC`, GPU `UTIL`, PCIe badge (owner's pick from the review) | ✅ Done |
 | 27 | App card left column: Context and Peak move to the end, after threads, so the rows above stay in place at engine start | ✅ Done |
-| 28 | Acceptance: app card shows `cache` below `RAM`, Context and Peak at the end of the left column, `out 32k`, `Peak`, a tooltip on every entry and the full command on the image name; tooltips on `ZFS ARC`, `UTIL` and the PCIe badge; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length | ✅ Done — owner acceptance on the `#dev` build (2026-11-15) |
+| 28 | Acceptance: app card shows `cache` below `RAM`, Context and Peak at the end of the left column, `out`, `Peak`, a tooltip on every entry and the full command on the image name; tooltips on `ZFS ARC`, `UTIL` and the PCIe badge; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length | ✅ Done — owner acceptance on the `#dev` build (2026-11-15) |
 | 29 | Release v1.6.2: bump, merge dev → main, GitHub release; Dockge stack back on `#main` | ✅ Done |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
