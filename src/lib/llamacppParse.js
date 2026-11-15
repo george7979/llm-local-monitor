@@ -149,6 +149,8 @@ export function formatCacheRam(v) {
   return n >= 1024 ? `${Math.round((n / 1024) * 10) / 10} GiB` : `${n} MiB`;
 }
 
+const SPLIT_TITLE = 'How the model is split across GPUs (-sm / --split-mode): layer = whole layers per card, row = rows of each layer, tensor = each layer across all cards, none = one card';
+
 const N_PREDICT_TITLE = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
 
 /** --n-predict as shown: 32768 → '32k', 1000 → '1000'; -1 / 0 / -2 (no fixed limit) and non-numbers → null. */
@@ -167,7 +169,8 @@ export function launchParams(command) {
   const add = (label, value) => { if (value != null && value !== '') out.push({ label, value }); };
   const pair = (a, b) => (a && b ? (a === b ? a : `${a} / ${b}`) : a || b);
 
-  add('split', flagValue(command, ['-sm', '--split-mode']));
+  const split = flagValue(command, ['-sm', '--split-mode']);
+  if (split) out.push({ label: 'split', value: split, title: SPLIT_TITLE });
   // Speculative decoding: MTP gets its own label, any other type shows as
   // "spec <type> ×n"; "none" shows nothing.
   const spec = flagValue(command, ['--spec-type']);

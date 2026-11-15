@@ -91,12 +91,13 @@ test('mapModelRow', () => {
   assert.deepEqual(mapModelRow({}, {}, 0),
     { name: '', parameterSize: '', quantization: '', contextLength: 0, sizeVram: 0 });
 });
+const SPLIT = 'How the model is split across GPUs (-sm / --split-mode): layer = whole layers per card, row = rows of each layer, tensor = each layer across all cards, none = one card';
 test('launchParams', () => {
   const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '131072', '-np', '1', '-t', '8', '-ub', '512', '-b', '2048',
                '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '3',
                '--reasoning-budget', '2048', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
   assert.deepEqual(launchParams(cmd), [
-    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
+    { label: 'split', value: 'tensor', title: SPLIT }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
     { label: 'threads', value: '8' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '2048 / 512' },
     { label: 'reasoning', value: '2048' },
   ]);
@@ -108,7 +109,7 @@ test('launchParams', () => {
 test('launchParams: long aliases, MTP without length, other spec types, none', () => {
   assert.deepEqual(launchParams(['--split-mode', 'row', '--parallel', '2', '--threads', '8',
     '--batch-size', '512', '--ubatch-size', '256', '--cache-type-k', 'f16', '--cache-type-v', 'f16', '--spec-type', 'mtp']), [
-    { label: 'split', value: 'row' }, { label: 'MTP', value: 'on' }, { label: 'slots', value: '2' },
+    { label: 'split', value: 'row', title: SPLIT }, { label: 'MTP', value: 'on' }, { label: 'slots', value: '2' },
     { label: 'threads', value: '8' }, { label: 'KV', value: 'f16' }, { label: 'batch', value: '512 / 256' },
   ]);
   assert.deepEqual(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '3']), [{ label: 'spec', value: 'ngram ×3' }]);

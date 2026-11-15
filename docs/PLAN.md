@@ -195,7 +195,7 @@ Rejected during design, recorded so it is not re-litigated:
 **Status:** 🔄 Released as v1.6.1 (cache hit rate on top of v1.6.0); screenshots open
 
 **Current step.** v1.6.1 is released. The Dockge stack builds `#dev` for the owner
-test of the prompt cache limit, output limit, prefill and peak (item 24); after it, release v1.6.2 and back to `#main`.
+test of the prompt cache limit, output limit, prefill and peak (item 25); after it, release v1.6.2 and back to `#main`.
 Open: the owner supplies new screenshots and they replace the v1.5
 images in the README (item 16). Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
@@ -232,7 +232,8 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 21 | Prefill speed in the model card header; context peak since engine start (`Peak 179k (90%)`) in the app card | ✅ Done |
 | 22 | Fix: `/slots` `n_prompt_tokens` already includes generated tokens — Context no longer adds `n_decoded` twice, live cache share divides by the prompt alone | ✅ Done |
 | 23 | Per-request output limit (`-n` / `--n-predict`) in the app card launch parameters as `out 32k`, after `reasoning` | ✅ Done |
-| 24 | Acceptance: app card shows `cache 32 GiB`, `out 32k` and `Peak`; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
+| 24 | App card columns: prompt cache limit moves to the left column below RAM (then slots, threads); split mode gets a tooltip explaining the modes | ✅ Done |
+| 25 | Acceptance: app card shows `cache` below `RAM`, `out 32k`, `Peak` and the `split` tooltip; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`

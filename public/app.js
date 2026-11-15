@@ -790,7 +790,9 @@ function appRow(key, value, title) {
 
 // Launch parameters that describe the host side of the engine; the rest
 // describe how the model is run.
-const HOST_PARAMS = new Set(['threads', 'slots']);
+// Launch parameters about the host go to the left column, in this order
+// (cache-ram right below RAM); the rest stay on the right.
+const HOST_PARAMS = ['cache', 'slots', 'threads'];
 
 // The card's entries in two columns grouped by subject — left "host and
 // load" (context, CPU, RAM, slots, threads), right "how the model runs"
@@ -822,9 +824,13 @@ function appEntries(data, slots, llama, peak) {
   }
   if (llama) {
     // Launch parameters, read-only; the full command is the tooltip.
-    for (const p of data.launch?.params || []) {
-      (HOST_PARAMS.has(p.label) ? left : right).push(appRow(p.label, p.value, p.title || data.launch.command || ''));
+    const params = data.launch?.params || [];
+    const row = p => appRow(p.label, p.value, p.title || data.launch.command || '');
+    for (const label of HOST_PARAMS) {
+      const p = params.find(x => x.label === label);
+      if (p) left.push(row(p));
     }
+    for (const p of params) if (!HOST_PARAMS.includes(p.label)) right.push(row(p));
   }
   return { left, right };
 }
