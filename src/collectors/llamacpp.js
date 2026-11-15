@@ -3,7 +3,7 @@ import { cached } from '../lib/cache.js';
 import { cfg } from '../config.js';
 import {
   parseMetrics, mapModelRow, contextFill, overallActivity, pickSpeed, pickMtp,
-  liveCache, pickCache,
+  liveCache, pickCache, pickPrefill, contextPeak,
   initialState, advance, modelPayloadsOk,
 } from '../lib/llamacppParse.js';
 
@@ -26,7 +26,7 @@ async function get(path, asText = false) {
   return asText ? body.text() : body.json();
 }
 
-const NOT_READY = { models: [], loading: true, activity: null, speed: null, mtp: null, cache: null, slots: [] };
+const NOT_READY = { models: [], loading: true, activity: null, speed: null, mtp: null, cache: null, prefill: null, peak: null, slots: [] };
 
 // Shared in-flight read: `cached()` does not share one, and two overlapping
 // misses would run advance() milliseconds apart.
@@ -60,6 +60,9 @@ function read(vramBytes) {
       speed: pickSpeed(step.lives, step.lastWindow, step.lifetime),
       mtp: pickMtp(step.lastWindow, step.lifetime),
       cache: pickCache(liveCache(slotList), step.lastWindow, step.lifetime),
+      prefill: pickPrefill(step.lastWindow, step.lifetime),
+      // Last good /metrics (state keeps it when this poll's read failed).
+      peak: contextPeak(step.state.metrics, slotList),
       slots: (slotList ?? []).map(contextFill),
     };
   });

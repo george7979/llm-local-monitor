@@ -230,7 +230,7 @@ async function pollAll() {
     renderModels(data.models, eng, data.host);
     lastLoadedModels = eng.active === 'ollama' || !eng.enabled ? (data.models?.models || []) : [];
     if (modelsModalOpen) renderModelsModal();
-    renderEngineApp(data.engineApp, eng, data.host, data.models?.slots);
+    renderEngineApp(data.engineApp, eng, data.host, data.models?.slots, data.models?.peak);
     renderGpu(data.gpu);
     lastGpuSnapshot = { gpu: data.gpu, procs: data.gpuProcs };
     if (gpuModalBusId) renderGpuModal();
@@ -471,7 +471,7 @@ const WINDOW_TITLES = {
   lifetime: 'average since engine start',
 };
 
-// Header right side: ▶ 21.7 tok/s · MTP 61% · cache 96%. Only a live figure gets the marker.
+// Header right side: ▶ 21.7 tok/s · prefill 295 tok/s · MTP 61% · cache 96%; wraps at the separators. Only a live figure gets the marker.
 function renderSpeed(data, node) {
   node.textContent = '';
   node.hidden = false;
@@ -490,8 +490,14 @@ function renderSpeed(data, node) {
   if (sp && part.title === '') part.title = WINDOW_TITLES[sp.window] || '';
   node.appendChild(part);
 
+  if (data.prefill) {
+    node.appendChild(el('span', 'speed-dim speed-sep', ' · '));
+    const pf = el('span', 'speed-dim', `prefill ${Math.round(data.prefill.value)} tok/s`);
+    pf.title = `prompt reading speed ${data.prefill.value} tok/s, cached tokens excluded — ${WINDOW_TITLES[data.prefill.window] || ''}`;
+    node.appendChild(pf);
+  }
   if (data.mtp) {
-    node.appendChild(el('span', 'speed-dim', ' · '));
+    node.appendChild(el('span', 'speed-dim speed-sep', ' · '));
     const mtp = el('span', 'speed-dim', `MTP ${data.mtp.pct}%`);
     mtp.title = WINDOW_TITLES[data.mtp.window] || '';
     node.appendChild(mtp);
@@ -499,7 +505,7 @@ function renderSpeed(data, node) {
 
   if (data.cache) {
     const c = data.cache;
-    node.appendChild(el('span', 'speed-dim', ' · '));
+    node.appendChild(el('span', 'speed-dim speed-sep', ' · '));
     const span = el('span', 'speed-dim', `cache ${c.pct}%`);
     span.title = c.window === 'live'
       ? `current request: ${c.cached.toLocaleString()} of ${c.total.toLocaleString()} prompt tokens from cache`
@@ -622,7 +628,8 @@ function renderGpu(data) {
     // Util bar
     const utilPct = Math.min(100, Math.max(0, g.utilization));
     const utilCls = utilPct > 80 ? 'fill-high' : utilPct > 50 ? 'fill-mid' : 'fill-low';
-    card.appendChild(makeGpuBar('UTIL', `${utilPct}%`, utilPct, utilCls));
+    card.appendChild(makeGpuBar('UTIL', `${utilPct}%`, utilPct, utilCls,
+      'Share of the last sample period in which a GPU kernel was running (nvidia-smi) — not how much of the GPU it used'));
 
     // VRAM bar
     const memPct = g.memTotal > 0 ? Math.round(g.memUsed / g.memTotal * 100) : 0;
@@ -643,7 +650,12 @@ function renderGpu(data) {
       badge.title = ENGINE_NAMES[g.engine] || g.engine;
       badges.appendChild(badge);
     }
-    if (g.pcieGen && g.pcieWidth) badges.appendChild(el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`));
+    if (g.pcieGen && g.pcieWidth) {
+      const pcie = el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`);
+      pcie.title = `Current PCIe link: gen ${g.pcieGen}, ${g.pcieWidth} lanes. `
+        + 'At idle the card drops to gen 1 to save power; under load it should return to its maximum — gen 1 under load means a slow link';
+      badges.appendChild(pcie);
+    }
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
     card.appendChild(badges);
 
@@ -651,8 +663,9 @@ function renderGpu(data) {
   });
 }
 
-function makeGpuBar(label, valText, pct, fillCls) {
+function makeGpuBar(label, valText, pct, fillCls, title) {
   const row = el('div', 'gpu-row');
+  if (title) row.title = title;
   const head = el('div', 'gpu-row-head');
   head.appendChild(el('span', 'gpu-row-label', label));
   head.appendChild(el('span', 'gpu-row-val', valText));
@@ -782,16 +795,39 @@ function appRow(key, value, title) {
   return row;
 }
 
-// Launch parameters that describe the host side of the engine; the rest
-// describe how the model is run.
-const HOST_PARAMS = new Set(['threads', 'slots']);
+// Launch parameters about the host side, shown in the left column in this
+// order (prompt cache limit right below RAM); the rest describe how the model
+// is run and stay on the right.
+const HOST_PARAMS = ['cache', 'slots', 'threads'];
 
 // The card's entries in two columns grouped by subject — left "host and
-// load" (context, CPU, RAM, slots, threads), right "how the model runs"
-// (split, MTP, KV cache, batch, reasoning). An entry whose data is missing is
+// load" (CPU, RAM, prompt cache, slots, threads, context, peak), right "how
+// the model runs" (split, MTP, KV cache, batch, reasoning, output limit). An entry whose data is missing is
 // left out.
-function appEntries(data, slots, llama) {
+function appEntries(data, slots, llama, peak) {
   const left = [], right = [];
+  if (data.cpu) {
+    left.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
+      'Share of all host cores used by the app container'));
+  }
+  if (data.memory?.used) {
+    const { used, max } = data.memory;
+    left.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used),
+      max > 0 ? 'Memory used by the app container / its limit' : 'Memory used by the app container'));
+  }
+  if (llama) {
+    // Launch parameters, read-only; each has its own tooltip, the full command
+    // is in the image name's tooltip.
+    const params = data.launch?.params || [];
+    const row = p => appRow(p.label, p.value, p.title || '');
+    for (const label of HOST_PARAMS) {
+      const p = params.find(x => x.label === label);
+      if (p) left.push(row(p));
+    }
+    for (const p of params) if (!HOST_PARAMS.includes(p.label)) right.push(row(p));
+  }
+  // Context and peak last: they are missing while the model loads and before the
+  // first request, so the rows above stay in place when they appear.
   if (llama) {
     (slots || []).forEach((sl, i) => {
       if (!sl.total) return;
@@ -801,24 +837,15 @@ function appEntries(data, slots, llama) {
         `${sl.used.toLocaleString()} / ${sl.total.toLocaleString()} tokens (${pct}%)`));
     });
   }
-  if (data.cpu) {
-    left.push(appRow('CPU', `${data.cpu.pct ?? 0}%${data.cpu.cores ? ` · ${data.cpu.cores} cores` : ''}`,
-      'Share of all host cores used by the app container'));
-  }
-  if (data.memory?.used) {
-    const { used, max } = data.memory;
-    left.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used)));
-  }
-  if (llama) {
-    // Launch parameters, read-only; the full command is the tooltip.
-    for (const p of data.launch?.params || []) {
-      (HOST_PARAMS.has(p.label) ? left : right).push(appRow(p.label, p.value, data.launch.command || ''));
-    }
+  if (llama && peak?.total) {
+    const pct = Math.round(peak.tokens / peak.total * 100);
+    left.push(appRow('Peak', `${fmtK(peak.tokens)} (${pct}%)`,
+      `Longest sequence since engine start: ${peak.tokens.toLocaleString()} / ${peak.total.toLocaleString()} tokens of the slot context`));
   }
   return { left, right };
 }
 
-function renderEngineApp(data, eng, host, slots) {
+function renderEngineApp(data, eng, host, slots, peak) {
   const wrap = document.getElementById('engine-app-content');
   const title = document.getElementById('engine-app-title');
   const imageEl = document.getElementById('engine-app-image');
@@ -848,13 +875,18 @@ function renderEngineApp(data, eng, host, slots) {
   statusRow.appendChild(updateBadge);
 
   // Show only name:tag — no registry, no organisation, no digest (TrueNAS pins
-  // the image by digest); the full reference stays in the tooltip.
+  // the image by digest); the full reference and, for llama.cpp, the full
+  // launch command stay in the tooltip.
   const image = data.image || '';
-  if (imageEl) { imageEl.textContent = image.split('@')[0].split('/').pop(); imageEl.title = image; }
+  const command = eng.active === 'llamacpp' ? data.launch?.command : '';
+  if (imageEl) {
+    imageEl.textContent = image.split('@')[0].split('/').pop();
+    imageEl.title = command ? `${image}\n\n${command}` : image;
+  }
   wrap.appendChild(statusRow);
 
   const list = el('div', 'app-rows');
-  const { left, right } = appEntries(data, slots, eng.active === 'llamacpp');
+  const { left, right } = appEntries(data, slots, eng.active === 'llamacpp', peak);
   // Nothing for the right column (Ollama): one full-width column.
   const cols = el('div', right.length ? 'app-cols' : 'app-cols single');
   for (const entries of right.length ? [left, right] : [left]) {
@@ -887,7 +919,8 @@ function renderMemory(data) {
 
   const segments = [
     { label: 'SERVICES', bytes: services, color: '#2e88ff' },
-    { label: 'ZFS ARC',  bytes: arc,      color: '#f59e0b' },
+    { label: 'ZFS ARC',  bytes: arc,      color: '#f59e0b',
+      title: 'ZFS read cache in RAM; the system frees it when apps need memory, so it is not memory taken' },
     { label: 'FREE',     bytes: free,     color: '#00c896' },
   ];
 
@@ -927,9 +960,10 @@ function renderMemory(data) {
 
   // ── Legend ──
   const legend = el('div', 'mem-legend');
-  segments.forEach(({ label, bytes, color }) => {
+  segments.forEach(({ label, bytes, color, title }) => {
     const pct = total > 0 ? (bytes / total * 100) : 0;
     const item = el('div', 'mem-legend-item');
+    if (title) item.title = title;
     const dot = el('div', 'mem-legend-dot');
     dot.style.background = color;
     const info = el('div', null);

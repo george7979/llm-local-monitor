@@ -89,6 +89,7 @@ export function requestWindow(prevM, curM) {
     speed: speedOf(dTokens, d('tokens_predicted_seconds_total')),
     mtp: mtpOf(d('spec_decode_num_accepted_tokens_total'), d('spec_decode_num_draft_tokens_total')),
     cache: cacheOf(d('prompt_tokens_cached_total'), d('prompt_tokens_total')),
+    prefill: speedOf(d('prompt_tokens_total'), d('prompt_seconds_total')),
   };
 }
 
@@ -97,6 +98,7 @@ export function lifetimeStats(m) {
     speed: speedOf(m?.tokens_predicted_total, m?.tokens_predicted_seconds_total),
     mtp: mtpOf(m?.spec_decode_num_accepted_tokens_total, m?.spec_decode_num_draft_tokens_total),
     cache: cacheOf(m?.prompt_tokens_cached_total, m?.prompt_tokens_total),
+    prefill: speedOf(m?.prompt_tokens_total, m?.prompt_seconds_total),
   };
 }
 
@@ -108,16 +110,20 @@ export function liveCache(slots) {
   let cached = 0, total = 0;
   for (const s of Array.isArray(slots) ? slots : []) {
     if (!s?.is_processing) continue;
-    const t = num(s.n_prompt_tokens), c = num(s.n_prompt_tokens_cache);
+    // The prompt alone: n_prompt_tokens includes the tokens generated so far.
+    const seq = num(s.n_prompt_tokens), c = num(s.n_prompt_tokens_cache);
+    const t = seq == null ? null : seq - decoded(s);
     if (t == null || c == null || t <= 0 || c > t) continue;
     cached += c; total += t;
   }
   return total > 0 ? { pct: Math.round((cached / total) * 100), cached, total } : null;
 }
 
+// /slots n_prompt_tokens already counts the tokens generated so far
+// (prompt + n_decoded): it is the slot's whole sequence, not the prompt alone.
 export function contextFill(slot) {
   return {
-    used: (num(slot?.n_prompt_tokens) ?? 0) + decoded(slot),
+    used: num(slot?.n_prompt_tokens) ?? 0,
     total: num(slot?.n_ctx) ?? 0,
   };
 }
@@ -134,27 +140,61 @@ function flagValue(args, names) {
   return undefined;
 }
 
-/** Fixed-order list of the launch parameters worth showing; unknown flags ignored. */
+/** --cache-ram value (MiB) for display: 32768 -> '32 GiB', 512 -> '512 MiB', -1 -> 'no limit', 0 -> 'off'. */
+export function formatCacheRam(v) {
+  const n = Number(v);
+  if (v == null || v === '' || !Number.isInteger(n)) return v;
+  if (n < 0) return 'no limit';
+  if (n === 0) return 'off';
+  return n >= 1024 ? `${Math.round((n / 1024) * 10) / 10} GiB` : `${n} MiB`;
+}
+
+const SPLIT_TITLE = 'How the model is split across GPUs (-sm / --split-mode): layer = whole layers per card, row = rows of each layer, tensor = each layer across all cards, none = one card';
+
+const N_PREDICT_TITLE = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
+
+/** --n-predict as shown: 32768 → '32k', 1000 → '1000'; -1 / 0 / -2 (no fixed limit) and non-numbers → null. */
+export function formatNPredict(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n % 1024 === 0 ? `${n / 1024}k` : String(n);
+}
+
+const CACHE_RAM_TITLE = 'Prompt cache limit in host RAM (--cache-ram); llama-server does not report how much of it is in use';
+
+/** Fixed-order list of the launch parameters worth showing, each with a tooltip saying what it means; unknown flags ignored. */
 export function launchParams(command) {
   if (!Array.isArray(command)) return [];
   const out = [];
-  const add = (label, value) => { if (value != null && value !== '') out.push({ label, value }); };
+  const add = (label, value, title) => { if (value != null && value !== '') out.push({ label, value, title }); };
   const pair = (a, b) => (a && b ? (a === b ? a : `${a} / ${b}`) : a || b);
 
-  add('split', flagValue(command, ['-sm', '--split-mode']));
+  add('split', flagValue(command, ['-sm', '--split-mode']), SPLIT_TITLE);
   // Speculative decoding: MTP gets its own label, any other type shows as
   // "spec <type> ×n"; "none" shows nothing.
   const spec = flagValue(command, ['--spec-type']);
   const draftN = flagValue(command, ['--spec-draft-n-max']);
-  if (spec && /mtp/i.test(spec)) add('MTP', draftN ? `×${draftN}` : 'on');
-  else if (spec && spec.toLowerCase() !== 'none') add('spec', draftN ? `${spec} ×${draftN}` : spec);
-  add('slots', flagValue(command, ['-np', '--parallel']));
-  add('threads', flagValue(command, ['-t', '--threads']));
-  add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])));
+  const drafted = draftN ? `, up to ${draftN} tokens drafted per step (--spec-draft-n-max)` : '';
+  if (spec && /mtp/i.test(spec)) {
+    add('MTP', draftN ? `×${draftN}` : 'on',
+      `Speculative decoding with the model's own MTP head (--spec-type ${spec})${drafted}; the header shows how many drafts are accepted`);
+  } else if (spec && spec.toLowerCase() !== 'none') {
+    add('spec', draftN ? `${spec} ×${draftN}` : spec, `Speculative decoding (--spec-type ${spec})${drafted}`);
+  }
+  add('slots', flagValue(command, ['-np', '--parallel']),
+    'Requests the server handles in parallel (-np / --parallel); the context is split between them');
+  add('threads', flagValue(command, ['-t', '--threads']), 'CPU threads for the work not done on the GPUs (-t / --threads)');
+  add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])),
+    'Precision of the context (KV) cache in VRAM, keys / values (-ctk / -ctv); lower fits more context at a small cost in accuracy');
+  const cram = flagValue(command, ['-cram', '--cache-ram']);
+  if (cram != null && cram !== '') add('cache', formatCacheRam(cram), CACHE_RAM_TITLE);
   const b = flagValue(command, ['-b', '--batch-size']);
   const ub = flagValue(command, ['-ub', '--ubatch-size']);
-  add('batch', b && ub ? `${b} / ${ub}` : b || ub);
-  add('reasoning', flagValue(command, ['--reasoning-budget']));
+  add('batch', b && ub ? `${b} / ${ub}` : b || ub,
+    'Prompt tokens processed per step, logical / physical batch (-b / -ub); larger speeds up prefill at the cost of VRAM');
+  add('reasoning', flagValue(command, ['--reasoning-budget']),
+    'Max thinking tokens before the answer (--reasoning-budget); -1 = no limit, 0 = thinking off');
+  add('out', formatNPredict(flagValue(command, ['-n', '--n-predict'])), N_PREDICT_TITLE);
   return out;
 }
 
@@ -196,6 +236,23 @@ export function pickCache(live, last, lifetime) {
   if (last?.cache != null) return { pct: last.cache, window: 'last' };
   if (lifetime?.cache != null) return { pct: lifetime.cache, window: 'lifetime' };
   return null;
+}
+
+/** Prompt-reading speed (tok/s, cached tokens excluded): last window -> lifetime -> null. */
+export function pickPrefill(last, lifetime) {
+  if (last?.prefill != null) return { value: last.prefill, window: 'last' };
+  if (lifetime?.prefill != null) return { value: lifetime.prefill, window: 'lifetime' };
+  return null;
+}
+
+/**
+ * Longest sequence seen since engine start (/metrics n_tokens_max) against
+ * the largest slot context; null without either.
+ */
+export function contextPeak(metrics, slots) {
+  const tokens = num(metrics?.n_tokens_max);
+  const total = Math.max(0, ...(Array.isArray(slots) ? slots : []).map(s => num(s?.n_ctx) ?? 0));
+  return tokens != null && tokens > 0 && total > 0 ? { tokens, total } : null;
 }
 
 /** Empty between-poll state: nothing sampled yet. */

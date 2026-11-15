@@ -688,7 +688,9 @@ tr.row-resident td.td-model::after {
 }
 
 .models-head-right { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.models-speed { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.models-speed { font-family: var(--mono); font-size: 11px; text-align: right; }
+.models-speed > span { white-space: nowrap; }
+.models-speed > .speed-sep { white-space: normal; }
 .speed-live { color: var(--green); font-weight: 600; }
 .speed-dim  { color: var(--dim); }
 
