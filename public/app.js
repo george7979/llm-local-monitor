@@ -628,7 +628,8 @@ function renderGpu(data) {
     // Util bar
     const utilPct = Math.min(100, Math.max(0, g.utilization));
     const utilCls = utilPct > 80 ? 'fill-high' : utilPct > 50 ? 'fill-mid' : 'fill-low';
-    card.appendChild(makeGpuBar('UTIL', `${utilPct}%`, utilPct, utilCls));
+    card.appendChild(makeGpuBar('UTIL', `${utilPct}%`, utilPct, utilCls,
+      'Share of the last sample period in which a GPU kernel was running (nvidia-smi) — not how much of the GPU it used'));
 
     // VRAM bar
     const memPct = g.memTotal > 0 ? Math.round(g.memUsed / g.memTotal * 100) : 0;
@@ -649,7 +650,12 @@ function renderGpu(data) {
       badge.title = ENGINE_NAMES[g.engine] || g.engine;
       badges.appendChild(badge);
     }
-    if (g.pcieGen && g.pcieWidth) badges.appendChild(el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`));
+    if (g.pcieGen && g.pcieWidth) {
+      const pcie = el('span', g.pcieGen === 1 ? 'badge warn' : 'badge badge-bus', `PCIe ${g.pcieGen}×${g.pcieWidth}`);
+      pcie.title = `Current PCIe link: gen ${g.pcieGen}, ${g.pcieWidth} lanes. `
+        + 'At idle the card drops to gen 1 to save power; under load it should return to its maximum — gen 1 under load means a slow link';
+      badges.appendChild(pcie);
+    }
     if (g.busId) badges.appendChild(el('span', 'badge badge-bus', g.busId));
     card.appendChild(badges);
 
@@ -657,8 +663,9 @@ function renderGpu(data) {
   });
 }
 
-function makeGpuBar(label, valText, pct, fillCls) {
+function makeGpuBar(label, valText, pct, fillCls, title) {
   const row = el('div', 'gpu-row');
+  if (title) row.title = title;
   const head = el('div', 'gpu-row-head');
   head.appendChild(el('span', 'gpu-row-label', label));
   head.appendChild(el('span', 'gpu-row-val', valText));
@@ -910,7 +917,8 @@ function renderMemory(data) {
 
   const segments = [
     { label: 'SERVICES', bytes: services, color: '#2e88ff' },
-    { label: 'ZFS ARC',  bytes: arc,      color: '#f59e0b' },
+    { label: 'ZFS ARC',  bytes: arc,      color: '#f59e0b',
+      title: 'ZFS read cache in RAM; the system frees it when apps need memory, so it is not memory taken' },
     { label: 'FREE',     bytes: free,     color: '#00c896' },
   ];
 
@@ -950,9 +958,10 @@ function renderMemory(data) {
 
   // ── Legend ──
   const legend = el('div', 'mem-legend');
-  segments.forEach(({ label, bytes, color }) => {
+  segments.forEach(({ label, bytes, color, title }) => {
     const pct = total > 0 ? (bytes / total * 100) : 0;
     const item = el('div', 'mem-legend-item');
+    if (title) item.title = title;
     const dot = el('div', 'mem-legend-dot');
     dot.style.background = color;
     const info = el('div', null);

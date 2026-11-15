@@ -234,8 +234,8 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 23 | Per-request output limit (`-n` / `--n-predict`) in the app card launch parameters as `out 32k`, after `reasoning` | ✅ Done |
 | 24 | App card columns: prompt cache limit moves to the left column below RAM (then slots, threads); split mode gets a tooltip explaining the modes | ✅ Done |
 | 25 | Tooltips for every app card entry: each launch parameter says what it does and its flag, RAM says usage / limit; the full launch command moves to the image name's tooltip | ✅ Done |
-| 26 | Review of the other cards: list of the places where a tooltip would explain a value, for the owner's decision | ⬜ Open |
-| 27 | Acceptance: app card shows `cache` below `RAM`, `out 32k`, `Peak`, a tooltip on every entry and the full command on the image name; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
+| 26 | Tooltips outside the app card where a value is easy to misread: `ZFS ARC`, GPU `UTIL`, PCIe badge (owner's pick from the review) | ✅ Done |
+| 27 | Acceptance: app card shows `cache` below `RAM`, `out 32k`, `Peak`, a tooltip on every entry and the full command on the image name; tooltips on `ZFS ARC`, `UTIL` and the PCIe badge; header shows `prefill N tok/s` and wraps at `·` on a narrow window; Context during a generation matches the session's real length; then release v1.6.2 and the stack back on `#main` | ⬜ Owner test on the `#dev` build |
 
 Spec: `docs/superpowers/specs/2026-11-10-llamacpp-engine-design.md`
 Plan: `docs/superpowers/plans/2026-11-10-llamacpp-engine.md`
