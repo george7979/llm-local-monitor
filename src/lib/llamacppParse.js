@@ -162,32 +162,39 @@ export function formatNPredict(v) {
 
 const CACHE_RAM_TITLE = 'Prompt cache limit in host RAM (--cache-ram); llama-server does not report how much of it is in use';
 
-/** Fixed-order list of the launch parameters worth showing; unknown flags ignored. */
+/** Fixed-order list of the launch parameters worth showing, each with a tooltip saying what it means; unknown flags ignored. */
 export function launchParams(command) {
   if (!Array.isArray(command)) return [];
   const out = [];
-  const add = (label, value) => { if (value != null && value !== '') out.push({ label, value }); };
+  const add = (label, value, title) => { if (value != null && value !== '') out.push({ label, value, title }); };
   const pair = (a, b) => (a && b ? (a === b ? a : `${a} / ${b}`) : a || b);
 
-  const split = flagValue(command, ['-sm', '--split-mode']);
-  if (split) out.push({ label: 'split', value: split, title: SPLIT_TITLE });
+  add('split', flagValue(command, ['-sm', '--split-mode']), SPLIT_TITLE);
   // Speculative decoding: MTP gets its own label, any other type shows as
   // "spec <type> ×n"; "none" shows nothing.
   const spec = flagValue(command, ['--spec-type']);
   const draftN = flagValue(command, ['--spec-draft-n-max']);
-  if (spec && /mtp/i.test(spec)) add('MTP', draftN ? `×${draftN}` : 'on');
-  else if (spec && spec.toLowerCase() !== 'none') add('spec', draftN ? `${spec} ×${draftN}` : spec);
-  add('slots', flagValue(command, ['-np', '--parallel']));
-  add('threads', flagValue(command, ['-t', '--threads']));
-  add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])));
+  const drafted = draftN ? `, up to ${draftN} tokens drafted per step (--spec-draft-n-max)` : '';
+  if (spec && /mtp/i.test(spec)) {
+    add('MTP', draftN ? `×${draftN}` : 'on',
+      `Speculative decoding with the model's own MTP head (--spec-type ${spec})${drafted}; the header shows how many drafts are accepted`);
+  } else if (spec && spec.toLowerCase() !== 'none') {
+    add('spec', draftN ? `${spec} ×${draftN}` : spec, `Speculative decoding (--spec-type ${spec})${drafted}`);
+  }
+  add('slots', flagValue(command, ['-np', '--parallel']),
+    'Requests the server handles in parallel (-np / --parallel); the context is split between them');
+  add('threads', flagValue(command, ['-t', '--threads']), 'CPU threads for the work not done on the GPUs (-t / --threads)');
+  add('KV', pair(flagValue(command, ['-ctk', '--cache-type-k']), flagValue(command, ['-ctv', '--cache-type-v'])),
+    'Precision of the context (KV) cache in VRAM, keys / values (-ctk / -ctv); lower fits more context at a small cost in accuracy');
   const cram = flagValue(command, ['-cram', '--cache-ram']);
-  if (cram != null && cram !== '') out.push({ label: 'cache', value: formatCacheRam(cram), title: CACHE_RAM_TITLE });
+  if (cram != null && cram !== '') add('cache', formatCacheRam(cram), CACHE_RAM_TITLE);
   const b = flagValue(command, ['-b', '--batch-size']);
   const ub = flagValue(command, ['-ub', '--ubatch-size']);
-  add('batch', b && ub ? `${b} / ${ub}` : b || ub);
-  add('reasoning', flagValue(command, ['--reasoning-budget']));
-  const np = formatNPredict(flagValue(command, ['-n', '--n-predict']));
-  if (np) out.push({ label: 'out', value: np, title: N_PREDICT_TITLE });
+  add('batch', b && ub ? `${b} / ${ub}` : b || ub,
+    'Prompt tokens processed per step, logical / physical batch (-b / -ub); larger speeds up prefill at the cost of VRAM');
+  add('reasoning', flagValue(command, ['--reasoning-budget']),
+    'Max thinking tokens before the answer (--reasoning-budget); -1 = no limit, 0 = thinking off');
+  add('out', formatNPredict(flagValue(command, ['-n', '--n-predict'])), N_PREDICT_TITLE);
   return out;
 }
 

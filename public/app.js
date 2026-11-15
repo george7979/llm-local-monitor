@@ -819,12 +819,14 @@ function appEntries(data, slots, llama, peak) {
   }
   if (data.memory?.used) {
     const { used, max } = data.memory;
-    left.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used)));
+    left.push(appRow('RAM', max > 0 ? `${fmt(used)} / ${fmt(max)}` : fmt(used),
+      max > 0 ? 'Memory used by the app container / its limit' : 'Memory used by the app container'));
   }
   if (llama) {
-    // Launch parameters, read-only; the full command is the tooltip.
+    // Launch parameters, read-only; each has its own tooltip, the full command
+    // is in the image name's tooltip.
     const params = data.launch?.params || [];
-    const row = p => appRow(p.label, p.value, p.title || data.launch.command || '');
+    const row = p => appRow(p.label, p.value, p.title || '');
     for (const label of HOST_PARAMS) {
       const p = params.find(x => x.label === label);
       if (p) left.push(row(p));
@@ -864,9 +866,14 @@ function renderEngineApp(data, eng, host, slots, peak) {
   statusRow.appendChild(updateBadge);
 
   // Show only name:tag — no registry, no organisation, no digest (TrueNAS pins
-  // the image by digest); the full reference stays in the tooltip.
+  // the image by digest); the full reference and, for llama.cpp, the full
+  // launch command stay in the tooltip.
   const image = data.image || '';
-  if (imageEl) { imageEl.textContent = image.split('@')[0].split('/').pop(); imageEl.title = image; }
+  const command = eng.active === 'llamacpp' ? data.launch?.command : '';
+  if (imageEl) {
+    imageEl.textContent = image.split('@')[0].split('/').pop();
+    imageEl.title = command ? `${image}\n\n${command}` : image;
+  }
   wrap.appendChild(statusRow);
 
   const list = el('div', 'app-rows');

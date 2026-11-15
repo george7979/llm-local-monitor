@@ -91,31 +91,32 @@ test('mapModelRow', () => {
   assert.deepEqual(mapModelRow({}, {}, 0),
     { name: '', parameterSize: '', quantization: '', contextLength: 0, sizeVram: 0 });
 });
-const SPLIT = 'How the model is split across GPUs (-sm / --split-mode): layer = whole layers per card, row = rows of each layer, tensor = each layer across all cards, none = one card';
+// Labels and values only; tooltips are checked in their own tests.
+const lv = cmd => launchParams(cmd).map(({ label, value }) => ({ label, value }));
 test('launchParams', () => {
   const cmd = ['-hf', 'org/model-a:Q8_0', '--alias', 'model-a', '-c', '131072', '-np', '1', '-t', '8', '-ub', '512', '-b', '2048',
                '-ctk', 'q8_0', '-ctv', 'q8_0', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '3',
                '--reasoning-budget', '2048', '-sm', 'tensor', '--metrics', '--some-future-flag', 'x'];
-  assert.deepEqual(launchParams(cmd), [
-    { label: 'split', value: 'tensor', title: SPLIT }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
+  assert.deepEqual(lv(cmd), [
+    { label: 'split', value: 'tensor' }, { label: 'MTP', value: '×3' }, { label: 'slots', value: '1' },
     { label: 'threads', value: '8' }, { label: 'KV', value: 'q8_0' }, { label: 'batch', value: '2048 / 512' },
     { label: 'reasoning', value: '2048' },
   ]);
-  assert.deepEqual(launchParams(['-c', '8192']), []);
-  assert.deepEqual(launchParams(undefined), []);
-  assert.deepEqual(launchParams(['-ctk', 'q8_0', '-ctv', 'q4_0']), [{ label: 'KV', value: 'q8_0 / q4_0' }]);
-  assert.deepEqual(launchParams(['-b', '4096']), [{ label: 'batch', value: '4096' }]);
+  assert.deepEqual(lv(['-c', '8192']), []);
+  assert.deepEqual(lv(undefined), []);
+  assert.deepEqual(lv(['-ctk', 'q8_0', '-ctv', 'q4_0']), [{ label: 'KV', value: 'q8_0 / q4_0' }]);
+  assert.deepEqual(lv(['-b', '4096']), [{ label: 'batch', value: '4096' }]);
 });
 test('launchParams: long aliases, MTP without length, other spec types, none', () => {
-  assert.deepEqual(launchParams(['--split-mode', 'row', '--parallel', '2', '--threads', '8',
+  assert.deepEqual(lv(['--split-mode', 'row', '--parallel', '2', '--threads', '8',
     '--batch-size', '512', '--ubatch-size', '256', '--cache-type-k', 'f16', '--cache-type-v', 'f16', '--spec-type', 'mtp']), [
-    { label: 'split', value: 'row', title: SPLIT }, { label: 'MTP', value: 'on' }, { label: 'slots', value: '2' },
+    { label: 'split', value: 'row' }, { label: 'MTP', value: 'on' }, { label: 'slots', value: '2' },
     { label: 'threads', value: '8' }, { label: 'KV', value: 'f16' }, { label: 'batch', value: '512 / 256' },
   ]);
-  assert.deepEqual(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '3']), [{ label: 'spec', value: 'ngram ×3' }]);
-  assert.deepEqual(launchParams(['--spec-type', 'ngram']), [{ label: 'spec', value: 'ngram' }]);
-  assert.deepEqual(launchParams(['--spec-type', 'none', '--spec-draft-n-max', '3']), []);
-  assert.deepEqual(launchParams(['-t']), []); // flag without value
+  assert.deepEqual(lv(['--spec-type', 'ngram', '--spec-draft-n-max', '3']), [{ label: 'spec', value: 'ngram ×3' }]);
+  assert.deepEqual(lv(['--spec-type', 'ngram']), [{ label: 'spec', value: 'ngram' }]);
+  assert.deepEqual(lv(['--spec-type', 'none', '--spec-draft-n-max', '3']), []);
+  assert.deepEqual(lv(['-t']), []); // flag without value
 });
 
 test('overallActivity: generating beats reading beats idle; null without slots', () => {
@@ -286,11 +287,11 @@ test('n_prompt_tokens counts generated tokens: live sample from b12359', () => {
 
 test('launchParams: --n-predict as out, after reasoning; no limit shows nothing', () => {
   const title = 'Max tokens generated per request (-n / --n-predict); longer replies are cut off';
-  assert.deepEqual(launchParams(['--reasoning-budget', '4096', '-n', '32768']),
-    [{ label: 'reasoning', value: '4096' }, { label: 'out', value: '32k', title }]);
+  assert.deepEqual(lv(['--reasoning-budget', '4096', '-n', '32768']),
+    [{ label: 'reasoning', value: '4096' }, { label: 'out', value: '32k' }]);
   assert.deepEqual(launchParams(['--n-predict', '1000']), [{ label: 'out', value: '1000', title }]);
   assert.deepEqual(launchParams(['-n', '-1']), []);
-  assert.deepEqual(launchParams(['-np', '1']), [{ label: 'slots', value: '1' }]);
+  assert.deepEqual(lv(['-np', '1']), [{ label: 'slots', value: '1' }]);
 });
 test('formatNPredict', () => {
   assert.equal(formatNPredict('32768'), '32k');
@@ -300,4 +301,16 @@ test('formatNPredict', () => {
   assert.equal(formatNPredict('-2'), null);
   assert.equal(formatNPredict('0'), null);
   assert.equal(formatNPredict('abc'), null);
+});
+
+test('launchParams: every entry has a tooltip; speculative tooltips carry the configured values', () => {
+  const cmd = ['-sm', 'tensor', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '4', '-np', '1', '-t', '12',
+               '-ctk', 'q8_0', '-ctv', 'q8_0', '--cache-ram', '49152', '-b', '4096', '-ub', '2048',
+               '--reasoning-budget', '4096', '-n', '32768'];
+  const r = launchParams(cmd);
+  assert.deepEqual(r.map(p => p.label), ['split', 'MTP', 'slots', 'threads', 'KV', 'cache', 'batch', 'reasoning', 'out']);
+  for (const p of r) assert.ok(p.title && p.title.length > 20, `${p.label} has a tooltip`);
+  assert.match(r[1].title, /draft-mtp.*up to 4 tokens/);
+  assert.match(launchParams(['--spec-type', 'ngram', '--spec-draft-n-max', '3'])[0].title, /ngram.*up to 3 tokens/);
+  assert.doesNotMatch(launchParams(['--spec-type', 'mtp'])[0].title, /up to/);
 });
