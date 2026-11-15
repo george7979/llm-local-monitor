@@ -192,11 +192,10 @@ Rejected during design, recorded so it is not re-litigated:
 
 ## Milestone: v1.6.0 — llama.cpp as an alternative engine
 
-**Status:** 🔄 Released as v1.6.2 (cache hit rate, prefill, context peak, launch parameter tooltips on top of v1.6.0); screenshots open
+**Status:** ✅ Released as v1.6.2 (cache hit rate, prefill, context peak, launch parameter tooltips on top of v1.6.0)
 
-**Current step.** v1.6.2 is released and the Dockge stack builds `#main`. `dev` is one commit ahead (neutral example values in tests and docs); it goes to `main` with the README screenshots (item 16), version unchanged.
-Open: the owner supplies new screenshots and they replace the v1.5
-images in the README (item 16). Development rule: no switch or restart of the engine on
+**Current step.** v1.6.2 is released and the Dockge stack builds `#main`.
+Development rule: no switch or restart of the engine on
 the live server without the owner's go-ahead (`CLAUDE.md`).
 
 The dashboard follows whichever engine is active — Ollama or a llama.cpp server
@@ -222,7 +221,7 @@ v1.5.1. Update all apps skips every engine app that is not the active one.
 | 13a | Acceptance: an engine action refused while TrueNAS runs a job on an engine app (e.g. restart from the TrueNAS UI, then Switch → 409 naming the job; SERVER card shows `TrueNAS: … on …`). Also confirm on the server what could not be read from job history: the `arguments` of `app.upgrade` / `app.upgrade_bulk` / `app.pull_images` jobs name the app, and `midclt call -j app.start` exits non-zero when the start job fails | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-11) |
 | 14 | Release: bump to v1.6.0, merge dev → main, GitHub release (owner's decision) | ✅ Done |
 | 15 | Point the Dockge stack back at `#main` and rebuild on v1.6.0 (since 2026-11-10 it builds `#dev` for the acceptance test, with `LLAMACPP_APP_NAME` / `LLAMACPP_BASE_URL` set in the stack `.env`) | ✅ Done — compose on `#main`, `/api/config` reports `1.6.0`, no collector errors |
-| 16 | README screenshots: replace `pics/dashboard-eng-1.5-a.png` / `-b.png` with current shots (the owner supplies them); they go to `main` by a merge from `dev` together with the neutral example values, without a version bump, tag or GitHub release — neither changes the running code | ⬜ Open |
+| 16 | README screenshot: one dashboard shot in a dark and a light version, chosen by the reader's `prefers-color-scheme`; the v1.5 shots are gone, the "Available models" one without a replacement (the text describes the dialog). Merged to `main` with the neutral example values, without a version bump, tag or GitHub release — neither changes the running code | ✅ Done |
 
 | 17 | Prompt cache hit rate in the llama.cpp model card header (`cache NN%`): current request from `/slots`, otherwise last window / lifetime from `/metrics` | ✅ Done |
 | 18 | Acceptance: during a session the header shows `cache NN%` with the current request's token counts in the tooltip; after it the dimmed last-request value | ✅ Done — owner acceptance on the `#dev` build, no remarks (2026-11-14) |
